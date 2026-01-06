@@ -1,13 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button, Row, Col, Badge, ProgressBar, Table, Form, InputGroup } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  Button,
+  Row,
+  Col,
+  Badge,
+  ProgressBar,
+  Table,
+  Form,
+  InputGroup,
+} from "react-bootstrap";
+import { Link } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import axios from "axios";
 
 const TeacherClasses = () => {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetchClasses();
@@ -15,25 +25,28 @@ const TeacherClasses = () => {
 
   const fetchClasses = async () => {
     try {
-      const response = await axios.get('/api/teacher/dashboard');
+      const response = await axios.get("/api/teacher/dashboard");
       setClasses(response.data.data.classes || []);
     } catch (error) {
-      toast.error('Failed to fetch classes');
+      toast.error("Failed to fetch classes");
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredClasses = classes.filter(cls =>
-    cls.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cls.grade_level.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredClasses = classes.filter(
+    (cls) =>
+      cls.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cls.grade_level.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div>
       <div className="mb-4">
         <h1 className="h3 mb-2">My Classes</h1>
-        <p className="text-muted">View and manage all classes assigned to you</p>
+        <p className="text-muted">
+          View and manage all classes assigned to you
+        </p>
       </div>
 
       <Card className="border-0 shadow-sm mb-4">
@@ -63,7 +76,9 @@ const TeacherClasses = () => {
             <div className="text-center py-5">
               <i className="bi bi-collection display-1 text-muted mb-3"></i>
               <h4>No Classes Assigned</h4>
-              <p className="text-muted">You haven't been assigned to any classes yet.</p>
+              <p className="text-muted">
+                You haven't been assigned to any classes yet.
+              </p>
             </div>
           ) : (
             <Row className="g-4">
@@ -73,7 +88,9 @@ const TeacherClasses = () => {
                     <Card.Body>
                       <div className="d-flex justify-content-between align-items-start mb-3">
                         <div>
-                          <Badge bg="primary" className="mb-2">Grade {cls.grade_level}</Badge>
+                          <Badge bg="primary" className="mb-2">
+                            Grade {cls.grade_level}
+                          </Badge>
                           <h5 className="mb-1">{cls.class_name}</h5>
                           <p className="text-muted small mb-0">
                             Academic Year: {cls.academic_year}
@@ -83,15 +100,21 @@ const TeacherClasses = () => {
                           <i className="bi bi-people-fill text-primary fs-4"></i>
                         </div>
                       </div>
-                      
+
                       <div className="mb-3">
                         <div className="d-flex justify-content-between small text-muted mb-1">
                           <span>Learners</span>
-                          <span>{cls.learner_count || 0}/{cls.max_capacity || 30}</span>
+                          <span>
+                            {cls.learner_count || 0}/{cls.max_capacity || 30}
+                          </span>
                         </div>
-                        <ProgressBar 
-                          now={((cls.learner_count || 0) / (cls.max_capacity || 30)) * 100} 
-                          style={{ height: '6px' }}
+                        <ProgressBar
+                          now={
+                            ((cls.learner_count || 0) /
+                              (cls.max_capacity || 30)) *
+                            100
+                          }
+                          style={{ height: "6px" }}
                         />
                       </div>
 
@@ -99,15 +122,23 @@ const TeacherClasses = () => {
                         <div className="mb-3">
                           <div className="row text-center">
                             <div className="col-4">
-                              <div className="fw-bold">{cls.stats.totalAssessments || 0}</div>
-                              <div className="text-muted small">Assessments</div>
+                              <div className="fw-bold">
+                                {cls.stats.totalAssessments || 0}
+                              </div>
+                              <div className="text-muted small">
+                                Assessments
+                              </div>
                             </div>
                             <div className="col-4">
-                              <div className="fw-bold">{cls.stats.averageScore || 0}%</div>
+                              <div className="fw-bold">
+                                {cls.stats.averageScore || 0}%
+                              </div>
                               <div className="text-muted small">Avg Score</div>
                             </div>
                             <div className="col-4">
-                              <div className="fw-bold">{cls.stats.totalLearners || 0}</div>
+                              <div className="fw-bold">
+                                {cls.stats.totalLearners || 0}
+                              </div>
                               <div className="text-muted small">Learners</div>
                             </div>
                           </div>
@@ -115,16 +146,16 @@ const TeacherClasses = () => {
                       )}
 
                       <div className="d-grid gap-2">
-                        <Button 
-                          as={Link} 
+                        <Button
+                          as={Link}
                           to={`/teacher/classes/${cls.class_id}`}
                           variant="outline-primary"
                         >
                           <i className="bi bi-eye me-2"></i>
-                          View Class
+                          View Class Details
                         </Button>
-                        <Button 
-                          as={Link} 
+                        <Button
+                          as={Link}
                           to={`/teacher/assessments?class=${cls.class_id}`}
                           variant="outline-success"
                         >
@@ -162,16 +193,24 @@ const TeacherClasses = () => {
                     <tr key={cls.class_id}>
                       <td>
                         <strong>{cls.class_name}</strong>
-                        <div className="text-muted small">Grade {cls.grade_level}</div>
-                      </td>
-                      <td>
-                        {cls.stats?.recentAssessments?.[0]?.assessment_name || 'No assessments'}
                         <div className="text-muted small">
-                          {cls.stats?.recentAssessments?.[0]?.scheduled_date || ''}
+                          Grade {cls.grade_level}
                         </div>
                       </td>
                       <td>
-                        <Badge bg={cls.stats?.averageScore > 70 ? 'success' : 'warning'}>
+                        {cls.stats?.recentAssessments?.[0]?.assessment_name ||
+                          "No assessments"}
+                        <div className="text-muted small">
+                          {cls.stats?.recentAssessments?.[0]?.scheduled_date ||
+                            ""}
+                        </div>
+                      </td>
+                      <td>
+                        <Badge
+                          bg={
+                            cls.stats?.averageScore > 70 ? "success" : "warning"
+                          }
+                        >
                           {cls.stats?.averageScore || 0}%
                         </Badge>
                       </td>

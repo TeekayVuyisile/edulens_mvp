@@ -3,6 +3,7 @@ import { requireTeacher } from '../middleware/authMiddleware.js';
 import * as teacherController from '../controllers/teacherController.js';
 import { validate } from '../middleware/validationMiddleware.js';
 import { body, param } from 'express-validator';
+import { uploadSingle } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -18,9 +19,43 @@ router.get('/classes/:classId',
   teacherController.getClassDetails
 );
 
+router.get('/classes/:classId/learners',
+  param('classId').isUUID(),
+  teacherController.getClassLearners
+);
+
 router.get('/classes/:classId/assessments',
   param('classId').isUUID(),
   teacherController.getClassAssessments
+);
+
+router.get('/classes/:classId/statistics',
+  param('classId').isUUID(),
+  teacherController.getClassStatistics
+);
+
+// Bulk Learners Management
+router.post('/classes/:classId/learners/bulk',
+  param('classId').isUUID(),
+  validate([
+    body('learners').isArray(),
+    body('learners.*.first_name').notEmpty(),
+    body('learners.*.last_name').notEmpty(),
+    body('learners.*.date_of_birth').optional().isISO8601(),
+    body('learners.*.gender').optional().isString(),
+    body('learners.*.guardian_name').optional().isString(),
+    body('learners.*.guardian_email').optional().isEmail(),
+    body('learners.*.guardian_phone').optional().isString()
+  ]),
+  teacherController.bulkAddLearners
+);
+
+router.post('/learners/bulk-import',
+  uploadSingle('file'),
+  validate([
+    body('class_id').isUUID()
+  ]),
+  teacherController.bulkImportLearners
 );
 
 // Assessment Management
@@ -74,7 +109,24 @@ router.post('/worksheets/save',
 );
 
 router.get('/worksheets/history', teacherController.getWorksheetHistory);
-
+// Add to the existing bulk learners route validation:
+router.post('/classes/:classId/learners/bulk',
+  param('classId').isUUID(),
+  validate([
+    body('learners').isArray(),
+    body('learners.*.first_name').notEmpty(),
+    body('learners.*.last_name').notEmpty(),
+    body('learners.*.date_of_birth').isISO8601(),
+    body('learners.*.gender').optional().isString(),
+    body('learners.*.guardian_name').optional().isString(),
+    body('learners.*.guardian_email').optional().isEmail(),
+    body('learners.*.guardian_phone').optional().isString(),
+    body('learners.*.has_special_needs').optional().isBoolean(),
+    body('learners.*.special_needs_notes').optional().isString(),
+    body('learners.*.medical_notes').optional().isString()
+  ]),
+  teacherController.bulkAddLearners
+);
 // Learner Management
 router.get('/learners/:learnerId',
   param('learnerId').isUUID(),
