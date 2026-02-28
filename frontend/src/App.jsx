@@ -40,6 +40,7 @@ import TeacherClasses from "./pages/teacher/Classes";
 import ClassDetails from "./pages/teacher/ClassDetails";
 import AddLearners from "./pages/teacher/AddLearners";
 import Assessments from "./pages/teacher/Assessments";
+import AssessmentGradebook from "./pages/teacher/AssessmentGradebook"
 import Worksheets from "./pages/teacher/Worksheets";
 import Grading from "./pages/teacher/Grading";
 
@@ -206,6 +207,15 @@ function App() {
                 <Layout>
                   <Assessments />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/teacher/assessments/:assessmentId/gradebook"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <AssessmentGradebook />
               </ProtectedRoute>
             }
           />

@@ -848,44 +848,7 @@ async function bulkImportLearnersProcess(learners, classId, schoolId, teacherId,
   }
 }
 
-// @desc    Create assessment
-// @route   POST /api/teacher/assessments
-// @access  Private (Teacher)
-export const createAssessment = async (req, res) => {
-  try {
-    const teacherId = req.user.userId;
-    
-    const assessmentData = {
-      ...req.body,
-      teacher_id: teacherId
-    };
 
-    // Verify teacher has access to the class
-    const teacherClasses = await ClassModel.getByTeacher(teacherId);
-    const hasAccess = teacherClasses.some(c => c.class_id === assessmentData.class_id);
-    
-    if (!hasAccess) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Not authorized to create assessments for this class'
-      });
-    }
-
-    const assessment = await Assessment.create(assessmentData);
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Assessment created successfully',
-      data: { assessment }
-    });
-  } catch (error) {
-    console.error('Create assessment error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to create assessment'
-    });
-  }
-};
 
 // @desc    Get assessment gradebook
 // @route   GET /api/teacher/assessments/:assessmentId/gradebook
@@ -893,9 +856,27 @@ export const createAssessment = async (req, res) => {
 export const getAssessmentGradebook = async (req, res) => {
   try {
     const { assessmentId } = req.params;
+    const teacherId = req.user.userId;
+
+    // First get the assessment to verify ownership
+    const assessment = await Assessment.getById(assessmentId);
+    
+    if (!assessment) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Assessment not found'
+      });
+    }
+
+    // Verify teacher owns this assessment
+    if (assessment.teacher_id !== teacherId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized to access this assessment'
+      });
+    }
 
     const gradebook = await Assessment.getGradebook(assessmentId);
-    const assessment = await Assessment.getById(assessmentId);
 
     res.status(200).json({
       status: 'success',
@@ -908,7 +889,8 @@ export const getAssessmentGradebook = async (req, res) => {
     console.error('Get assessment gradebook error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to get gradebook'
+      message: 'Failed to get gradebook',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1119,6 +1101,491 @@ export const getLearnerProfile = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to get learner profile'
+    });
+  }
+};
+// @desc    Get all assessments for teacher
+// @route   GET /api/teacher/assessments
+// @access  Private (Teacher)
+export const getAssessments = async (req, res) => {
+  try {
+    const teacherId = req.user.userId;
+    const { term_number, class_id, assessment_type, page = 1, limit = 20 } = req.query;
+
+    const filters = {
+      term_number,
+      class_id,
+      assessment_type,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    };
+
+    const assessments = await Assessment.getByTeacher(teacherId, filters);
+
+    res.status(200).json({
+      status: 'success',
+      data: assessments
+    });
+  } catch (error) {
+    console.error('Get assessments error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get assessments'
+    });
+  }
+};
+
+// @desc    Get assessment by ID
+// @route   GET /api/teacher/assessments/:assessmentId
+// @access  Private (Teacher)
+export const getAssessment = async (req, res) => {
+  try {
+    const { assessmentId } = req.params;
+    const teacherId = req.user.userId;
+
+    const assessment = await Assessment.getById(assessmentId);
+    
+    if (!assessment) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Assessment not found'
+      });
+    }
+
+    // Verify teacher owns this assessment
+    if (assessment.teacher_id !== teacherId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized to view this assessment'
+      });
+    }
+
+    // Get resources for this assessment
+    const resourcesQuery = `
+      SELECT * FROM assessment_resources
+      WHERE assessment_id = $1
+      ORDER BY uploaded_at DESC
+    `;
+
+    const resourcesResult = await pool.query(resourcesQuery, [assessmentId]);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        assessment,
+        resources: resourcesResult.rows
+      }
+    });
+  } catch (error) {
+    console.error('Get assessment error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get assessment'
+    });
+  }
+};
+
+// @desc    Update assessment
+// @route   PUT /api/teacher/assessments/:assessmentId
+// @access  Private (Teacher)
+export const updateAssessment = async (req, res) => {
+  try {
+    const { assessmentId } = req.params;
+    const teacherId = req.user.userId;
+
+    // Verify teacher owns this assessment
+    const existingAssessment = await Assessment.getById(assessmentId);
+    if (!existingAssessment) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Assessment not found'
+      });
+    }
+
+    if (existingAssessment.teacher_id !== teacherId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized to update this assessment'
+      });
+    }
+
+    const assessment = await Assessment.update(assessmentId, req.body);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Assessment updated successfully',
+      data: { assessment }
+    });
+  } catch (error) {
+    console.error('Update assessment error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update assessment'
+    });
+  }
+};
+
+// @desc    Delete assessment
+// @route   DELETE /api/teacher/assessments/:assessmentId
+// @access  Private (Teacher)
+export const deleteAssessment = async (req, res) => {
+  try {
+    const { assessmentId } = req.params;
+    const teacherId = req.user.userId;
+
+    // Verify teacher owns this assessment
+    const existingAssessment = await Assessment.getById(assessmentId);
+    if (!existingAssessment) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Assessment not found'
+      });
+    }
+
+    if (existingAssessment.teacher_id !== teacherId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized to delete this assessment'
+      });
+    }
+
+    await Assessment.delete(assessmentId);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Assessment deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete assessment error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete assessment'
+    });
+  }
+};
+
+// @desc    Get teacher's classes, subjects, and topics for assessment creation
+// @route   GET /api/teacher/assessment-data
+// @access  Private (Teacher)
+export const getAssessmentData = async (req, res) => {
+  try {
+    const teacherId = req.user.userId;
+    const schoolId = req.user.schoolId;
+
+    // Get teacher's classes
+    const classesQuery = `
+      SELECT 
+        c.class_id,
+        c.class_name,
+        c.grade_level,
+        c.academic_year,
+        c.primary_teacher_id,
+        COUNT(DISTINCT l.learner_id) as learner_count
+      FROM class_teacher_assignments cta
+      JOIN classes c ON cta.class_id = c.class_id
+      LEFT JOIN learners l ON c.class_id = l.current_class_id AND l.academic_status = 'active'
+      WHERE cta.teacher_id = $1 AND c.is_active = true
+      GROUP BY c.class_id, c.class_name, c.grade_level, c.academic_year, c.primary_teacher_id
+      ORDER BY c.grade_level, c.class_name
+    `;
+
+    // Get school's assigned curricula and subjects for grades R-3
+    const curriculaQuery = `
+      SELECT 
+        sca.assignment_id,
+        cur.curriculum_id,
+        cur.curriculum_name,
+        sca.grade_level as assigned_grade
+      FROM school_curriculum_assignments sca
+      JOIN curricula cur ON sca.curriculum_id = cur.curriculum_id
+      WHERE sca.school_id = $1 
+        AND sca.is_active = true
+        AND sca.grade_level IN ('R', '1', '2', '3', 'R-3')
+      ORDER BY sca.grade_level, cur.curriculum_name
+    `;
+
+    // Get all active subjects for grades R-3 from curricula assigned to the school
+    const subjectsQuery = `
+      SELECT 
+        s.subject_id,
+        s.subject_name,
+        s.grade_level as subject_grade_level,
+        s.curriculum_id,
+        cur.curriculum_name
+      FROM subjects s
+      JOIN curricula cur ON s.curriculum_id = cur.curriculum_id
+      WHERE s.is_active = true 
+        AND cur.is_active = true
+        AND s.grade_level IN ('R', '1', '2', '3', 'R-3')
+        AND cur.curriculum_id IN (
+          SELECT curriculum_id FROM school_curriculum_assignments 
+          WHERE school_id = $1 AND is_active = true
+        )
+      ORDER BY s.grade_level, s.subject_name
+    `;
+
+    // Get topics for subjects
+    const topicsQuery = `
+      SELECT 
+        t.topic_id,
+        t.topic_name,
+        t.subject_id,
+        s.subject_name
+      FROM topics t
+      JOIN subjects s ON t.subject_id = s.subject_id
+      WHERE t.is_active = true
+      ORDER BY s.subject_name, t.topic_name
+    `;
+
+    const [classesResult, curriculaResult, subjectsResult, topicsResult] = await Promise.all([
+      pool.query(classesQuery, [teacherId]),
+      pool.query(curriculaQuery, [schoolId]),
+      pool.query(subjectsQuery, [schoolId]),
+      pool.query(topicsQuery)
+    ]);
+
+    // Debug logging
+    console.log('Curricula found:', curriculaResult.rows);
+    console.log('Subjects found:', subjectsResult.rows);
+
+    // Organize curricula with their subjects
+    const curricula = curriculaResult.rows.map(curriculum => {
+      const curriculumSubjects = subjectsResult.rows.filter(
+        subject => subject.curriculum_id === curriculum.curriculum_id
+      );
+      
+      return {
+        ...curriculum,
+        subjects: curriculumSubjects.map(subject => ({
+          subject_id: subject.subject_id,
+          subject_name: subject.subject_name,
+          subject_grade_level: subject.subject_grade_level
+        }))
+      };
+    });
+
+    // Group topics by subject
+    const topicsBySubject = {};
+    topicsResult.rows.forEach(row => {
+      if (!topicsBySubject[row.subject_id]) {
+        topicsBySubject[row.subject_id] = [];
+      }
+      topicsBySubject[row.subject_id].push({
+        topic_id: row.topic_id,
+        topic_name: row.topic_name
+      });
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        classes: classesResult.rows,
+        curricula: curricula,
+        topics_by_subject: topicsBySubject
+      }
+    });
+  } catch (error) {
+    console.error('Get assessment data error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get assessment data',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// @desc    Create assessment
+// @route   POST /api/teacher/assessments
+// @access  Private (Teacher)
+export const createAssessment = async (req, res) => {
+  try {
+    const teacherId = req.user.userId;
+    const schoolId = req.user.schoolId;
+    
+    // Get current academic year if not provided
+    const academicYear = req.body.academic_year || new Date().getFullYear();
+    
+    const assessmentData = {
+      ...req.body,
+      teacher_id: teacherId
+    };
+
+    console.log('Creating assessment with data:', assessmentData);
+
+    // Verify teacher has access to the class
+    const teacherClasses = await ClassModel.getByTeacher(teacherId);
+    const hasAccess = teacherClasses.some(c => c.class_id === assessmentData.class_id);
+    
+    if (!hasAccess) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized to create assessments for this class'
+      });
+    }
+
+    // Get curriculum_id from subject if not provided but subject is provided
+    if (!assessmentData.curriculum_id && assessmentData.subject_id) {
+      const subjectQuery = await pool.query(
+        'SELECT curriculum_id FROM subjects WHERE subject_id = $1',
+        [assessmentData.subject_id]
+      );
+      
+      if (subjectQuery.rows.length > 0) {
+        assessmentData.curriculum_id = subjectQuery.rows[0].curriculum_id;
+      }
+    }
+
+    const assessment = await Assessment.create(assessmentData);
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Assessment created successfully',
+      data: { assessment }
+    });
+  } catch (error) {
+    console.error('Create assessment error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to create assessment'
+    });
+  }
+};
+
+// @desc    Upload assessment resource
+// @route   POST /api/teacher/assessments/:assessmentId/resources
+// @access  Private (Teacher)
+export const uploadAssessmentResource = async (req, res) => {
+  try {
+    const { assessmentId } = req.params;
+    const teacherId = req.user.userId;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No file uploaded'
+      });
+    }
+
+    // Verify teacher owns this assessment
+    const assessment = await Assessment.getById(assessmentId);
+    if (!assessment) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Assessment not found'
+      });
+    }
+
+    if (assessment.teacher_id !== teacherId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized to add resources to this assessment'
+      });
+    }
+
+    // Determine resource type
+    const ext = req.file.originalname.split('.').pop().toLowerCase();
+    let resource_type = 'document';
+    const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const videoTypes = ['mp4', 'avi', 'mov', 'wmv'];
+    const audioTypes = ['mp3', 'wav', 'ogg'];
+
+    if (imageTypes.includes(ext)) resource_type = 'image';
+    else if (videoTypes.includes(ext)) resource_type = 'video';
+    else if (audioTypes.includes(ext)) resource_type = 'audio';
+    else if (ext === 'pdf') resource_type = 'pdf';
+    else if (ext === 'doc' || ext === 'docx') resource_type = 'document';
+
+    const resourceQuery = `
+      INSERT INTO assessment_resources (
+        assessment_id,
+        resource_name,
+        resource_type,
+        resource_url,
+        uploaded_by
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+
+    const resourceResult = await pool.query(resourceQuery, [
+      assessmentId,
+      req.file.originalname,
+      resource_type,
+      `/uploads/${req.file.filename}`,
+      teacherId
+    ]);
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Resource uploaded successfully',
+      data: { resource: resourceResult.rows[0] }
+    });
+  } catch (error) {
+    console.error('Upload assessment resource error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to upload resource'
+    });
+  }
+};
+
+// @desc    Delete assessment resource
+// @route   DELETE /api/teacher/assessments/:assessmentId/resources/:resourceId
+// @access  Private (Teacher)
+export const deleteAssessmentResource = async (req, res) => {
+  try {
+    const { assessmentId, resourceId } = req.params;
+    const teacherId = req.user.userId;
+
+    // Verify teacher owns this assessment
+    const assessment = await Assessment.getById(assessmentId);
+    if (!assessment) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Assessment not found'
+      });
+    }
+
+    if (assessment.teacher_id !== teacherId) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Not authorized to delete resources from this assessment'
+      });
+    }
+
+    // Get resource to delete
+    const resourceQuery = `
+      SELECT * FROM assessment_resources
+      WHERE resource_id = $1 AND assessment_id = $2
+    `;
+
+    const resourceResult = await pool.query(resourceQuery, [resourceId, assessmentId]);
+    
+    if (resourceResult.rows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Resource not found'
+      });
+    }
+
+    // Delete the resource
+    const deleteQuery = `
+      DELETE FROM assessment_resources
+      WHERE resource_id = $1
+      RETURNING *
+    `;
+
+    await pool.query(deleteQuery, [resourceId]);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Resource deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete assessment resource error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete resource'
     });
   }
 };

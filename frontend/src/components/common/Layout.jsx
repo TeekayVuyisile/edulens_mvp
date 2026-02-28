@@ -39,12 +39,13 @@ const Layout = ({ children }) => {
           icon: "clipboard",
           label: "Assessments",
         },
+        { path: "/teacher/grading", icon: "pencil", label: "Grading" },
         {
           path: "/teacher/worksheets",
           icon: "file-earmark-text",
           label: "Worksheets",
         },
-        { path: "/teacher/grading", icon: "pencil", label: "Grading" },
+        
       ],
       learner: [
         {
