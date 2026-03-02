@@ -312,6 +312,7 @@ npm run dev
 cd frontend
 npm install
 npm run dev
+
 📈 Scalability & Future Enhancements
 
 Planned future improvements:
