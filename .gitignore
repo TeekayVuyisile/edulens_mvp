@@ -4,6 +4,7 @@ node_modules/
 # Environment variables
 .env
 CLAUDE.md
+.claude
 # Logs
 logs/
 *.log
@@ -17,3 +18,9 @@ dist/
 
 # OS files
 .DS_Store
+
+# User-uploaded files
+backend/uploads/
+
+# Test coverage
+coverage/

@@ -100,7 +100,7 @@ export const login = async (req, res) => {
     const token = User.generateToken(user);
 
     // Remove password hash from response
-    const { password_hash, ...userWithoutPassword } = user;
+    const { password_hash: _passwordHash, ...userWithoutPassword } = user;
 
     res.status(200).json({
       status: 'success',

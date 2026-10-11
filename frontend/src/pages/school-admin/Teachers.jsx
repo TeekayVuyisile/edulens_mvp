@@ -89,7 +89,7 @@ const Teachers = () => {
       });
       setTeachers(response.data.data.users || []);
       setTotalPages(response.data.data.totalPages || 1);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch teachers');
     } finally {
       setLoading(false);
@@ -225,7 +225,7 @@ const Teachers = () => {
       setAssignedClasses(response.data.data.classes || []);
       
       setShowDetailsModal(true);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch teacher details');
     }
   };
@@ -300,7 +300,7 @@ const Teachers = () => {
       });
       toast.success(`Teacher ${currentStatus ? 'deactivated' : 'activated'} successfully`);
       fetchTeachers();
-    } catch (error) {
+    } catch {
       toast.error('Failed to update teacher status');
     }
   };

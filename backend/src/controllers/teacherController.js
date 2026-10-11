@@ -668,7 +668,7 @@ export const bulkImportLearners = async (req, res) => {
     }
 
     // Process learners using the same logic as manual bulk add
-    const results = await bulkImportLearnersProcess(learners, class_id, schoolId, teacherId, classData);
+    const results = await bulkImportLearnersProcess(learners, class_id, schoolId, teacherId);
 
     res.status(200).json({
       status: 'success',
@@ -687,7 +687,7 @@ export const bulkImportLearners = async (req, res) => {
 };
 
 // Helper function to process bulk import learners
-async function bulkImportLearnersProcess(learners, classId, schoolId, teacherId, classData) {
+async function bulkImportLearnersProcess(learners, classId, schoolId, teacherId) {
   const results = {
     summary: {
       total: learners.length,
@@ -1400,11 +1400,7 @@ export const getAssessmentData = async (req, res) => {
 export const createAssessment = async (req, res) => {
   try {
     const teacherId = req.user.userId;
-    const schoolId = req.user.schoolId;
-    
-    // Get current academic year if not provided
-    const academicYear = req.body.academic_year || new Date().getFullYear();
-    
+
     const assessmentData = {
       ...req.body,
       teacher_id: teacherId

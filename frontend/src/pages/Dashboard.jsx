@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Button, Spinner, Table, Badge, ProgressBar } from 'react-bootstrap';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -269,7 +269,6 @@ const getGradeVariant = (grade) => {
 const SchoolAdminDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
 
   useEffect(() => {
     fetchData();

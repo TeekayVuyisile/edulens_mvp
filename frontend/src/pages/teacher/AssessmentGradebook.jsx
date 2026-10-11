@@ -167,7 +167,7 @@ const AssessmentGradebook = () => {
     setSaving(true);
     try {
       const grades = Object.entries(bulkScores)
-        .filter(([learnerId, score]) => score !== '')
+        .filter(([, score]) => score !== '')
         .map(([learnerId, score]) => ({
           learner_id: learnerId,
           marks_obtained: parseFloat(score),

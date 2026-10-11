@@ -1136,8 +1136,6 @@ export const updateUser = async (req, res) => {
       });
     }
 
-    const currentUser = userCheck.rows[0];
-
     // Validate school_id if provided
     if (updateData.school_id) {
       const schoolCheck = await pool.query(

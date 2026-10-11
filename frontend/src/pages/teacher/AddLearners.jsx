@@ -45,7 +45,7 @@ const AddLearners = () => {
     try {
       const response = await axios.get(`/api/teacher/classes/${classId}`);
       setClassDetails(response.data.data.class);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch class details');
       navigate(`/teacher/classes/${classId}`);
     }

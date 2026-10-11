@@ -106,16 +106,6 @@ const Grading = () => {
     setGradebook(updatedGradebook);
   };
 
-  const handleFeedbackChange = (learnerId, feedback) => {
-    const updatedGradebook = gradebook.map(item => {
-      if (item.learner_id === learnerId) {
-        return { ...item, teacher_feedback: feedback };
-      }
-      return item;
-    });
-    setGradebook(updatedGradebook);
-  };
-
   const validateGrade = (marks) => {
     if (!selectedAssessment) return null;
     
@@ -205,7 +195,7 @@ const Grading = () => {
     setSaving(true);
     try {
       const grades = Object.entries(bulkMarks)
-        .filter(([learnerId, marks]) => marks !== '')
+        .filter(([, marks]) => marks !== '')
         .map(([learnerId, marks]) => ({
           learner_id: learnerId,
           marks_obtained: parseFloat(marks),

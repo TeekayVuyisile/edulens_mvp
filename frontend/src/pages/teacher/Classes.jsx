@@ -27,7 +27,7 @@ const TeacherClasses = () => {
     try {
       const response = await axios.get("/api/teacher/dashboard");
       setClasses(response.data.data.classes || []);
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch classes");
     } finally {
       setLoading(false);

@@ -185,7 +185,7 @@ const Worksheets = () => {
     }
   };
 
-  const handleDownload = (worksheetId) => {
+  const handleDownload = () => {
     toast.success('Download starting...');
     // In a real app, this would trigger a PDF generation/download
   };

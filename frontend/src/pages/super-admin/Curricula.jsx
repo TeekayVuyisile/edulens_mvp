@@ -13,7 +13,6 @@ const Curricula = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCurriculum, setSelectedCurriculum] = useState(null);
   const [selectedSubject, setSelectedSubject] = useState(null);
-  const [selectedTopic, setSelectedTopic] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedItemType, setSelectedItemType] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,7 +45,7 @@ const Curricula = () => {
       setLoading(true);
       const response = await axios.get(`/api/super-admin/curricula?include_inactive=${includeInactive}`);
       setCurricula(response.data.data.curricula || []);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch curricula');
     } finally {
       setLoading(false);
@@ -96,7 +95,6 @@ const Curricula = () => {
     e.preventDefault();
     try {
       let endpoint = '';
-      let id = '';
       
       switch (selectedItemType) {
         case 'curriculum':
@@ -213,7 +211,7 @@ const Curricula = () => {
     setShowEditModal(true);
   };
 
-  const handleDeleteClick = (item, type, name) => {
+  const handleDeleteClick = (item, type) => {
     setSelectedItem(item);
     setSelectedItemType(type);
     setShowDeleteModal(true);
@@ -388,7 +386,7 @@ const Curricula = () => {
                     
                     {curriculum.subjects && curriculum.subjects.length > 0 ? (
                       <div className="ms-4">
-                        {curriculum.subjects.map((subject, sIndex) => (
+                        {curriculum.subjects.map((subject) => (
                           <div key={subject.subject_id} className="mb-3">
                             <Card className="border">
                               <Card.Body>

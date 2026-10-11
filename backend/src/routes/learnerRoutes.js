@@ -1,8 +1,7 @@
 import express from 'express';
-import { requireTeacher, requireSchoolAdmin, requireAdminOrTeacher } from '../middleware/authMiddleware.js';
+import { requireSchoolAdmin, requireAdminOrTeacher } from '../middleware/authMiddleware.js';
 import * as learnerController from '../controllers/learnerController.js';
 import { param } from 'express-validator';
-import { validate } from '../middleware/validationMiddleware.js';
 
 const router = express.Router();
 
