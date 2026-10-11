@@ -88,13 +88,25 @@ const Schools = () => {
     e.preventDefault();
     try {
       const response = await axios.post('/api/super-admin/schools', formData);
+      const newSchool = response.data.data.school;
+      
       toast.success('School created successfully');
       setShowModal(false);
-      // Set selected school for admin creation
-      const newSchool = response.data.data.school;
+      
+      // Reset only the school form fields, but keep the newly created school's ID
+      setFormData({
+        school_name: '',
+        contact_email: '',
+        contact_phone: '',
+        address: '',
+        city: '',
+        province: '',
+        country: 'South Africa',
+      });
+      
       setSelectedSchool(newSchool.school_id);
-      // Reset form and show admin modal
-      resetForm();
+      
+      // Prepare and show admin modal
       setAdminFormData({
         email: '',
         first_name: '',
@@ -126,6 +138,11 @@ const Schools = () => {
     }
     
     try {
+      if (!selectedSchool) {
+        toast.error('No school selected for admin account');
+        return;
+      }
+
       await axios.post(`/api/super-admin/schools/${selectedSchool}/admin`, {
         email: adminFormData.email,
         password: adminFormData.password,
@@ -136,8 +153,8 @@ const Schools = () => {
       
       toast.success('School admin account created successfully');
       setShowAdminModal(false);
+      setSelectedSchool(null); // Clear selection after full flow
       resetAdminForm();
-      // Refresh schools to update admin status
       fetchSchools();
     } catch (error) {
       console.error('Create admin error:', error.response?.data || error);
@@ -148,12 +165,21 @@ const Schools = () => {
   const handleAssignCurriculum = async (e) => {
     e.preventDefault();
     try {
+      if (!selectedSchool) {
+        toast.error('No school selected');
+        return;
+      }
+
+      const userString = localStorage.getItem('user');
+      const userId = userString ? JSON.parse(userString).userId : null;
+
       await axios.post(`/api/super-admin/schools/${selectedSchool}/curricula`, {
         ...assignData,
-        assigned_by: JSON.parse(localStorage.getItem('user'))?.userId // Get current user ID
+        assigned_by: userId
       });
       toast.success('Curriculum assigned successfully');
       setShowAssignModal(false);
+      setSelectedSchool(null);
       resetAssignForm();
     } catch (error) {
       console.error('Assign curriculum error:', error);

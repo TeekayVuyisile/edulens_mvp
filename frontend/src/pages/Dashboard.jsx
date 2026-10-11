@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Button } from 'react-bootstrap';
+import { Row, Col, Card, Button, Spinner, Table, Badge, ProgressBar } from 'react-bootstrap';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -43,14 +43,7 @@ const Dashboard = () => {
 };
 
 const SuperAdminDashboard = () => {
-  const [stats, setStats] = useState({
-    totalSchools: 0,
-    totalAdmins: 0,
-    totalTeachers: 0,
-    totalLearners: 0,
-    activeSessions: 0,
-    recentActivity: []
-  });
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -63,230 +56,171 @@ const SuperAdminDashboard = () => {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      // First try the dedicated statistics endpoint
       const response = await axios.get('/api/super-admin/statistics');
-      setStats(response.data.data);
-    } catch (error) {
-      console.error('Failed to fetch stats from /statistics:', error);
-      
-      // Fallback: Fetch data from other endpoints
-      try {
-        const [schoolsRes, usersRes] = await Promise.all([
-          axios.get('/api/super-admin/schools'),
-          axios.get('/api/super-admin/users')
-        ]);
-        
-        const schools = schoolsRes.data.data?.schools || [];
-        const users = usersRes.data.data?.users || [];
-        
-        setStats({
-          totalSchools: schools.length,
-          totalAdmins: users.filter(u => u.role === 'school_admin').length,
-          totalTeachers: users.filter(u => u.role === 'teacher').length,
-          totalLearners: users.filter(u => u.role === 'learner').length,
-          activeSessions: 0,
-          recentActivity: []
-        });
-      } catch (fallbackError) {
-        console.error('Failed to fetch fallback stats:', fallbackError);
+      if (response.data.status === 'success') {
+        setData(response.data.data);
       }
+    } catch (error) {
+      console.error('Failed to fetch super admin stats:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Define the stats array for mapping
-  const superAdminStats = [
-    { 
-      title: 'Total Schools', 
-      value: stats.totalSchools || 0, 
-      icon: 'building', 
-      color: 'primary', 
-      link: '/super-admin/schools' 
-    },
-    { 
-      title: 'School Admins', 
-      value: stats.totalAdmins || 0, 
-      icon: 'person-badge', 
-      color: 'info', 
-      link: '/super-admin/users' 
-    },
-    { 
-      title: 'Total Teachers', 
-      value: stats.totalTeachers || 0, 
-      icon: 'person-check', 
-      color: 'success', 
-      link: '/super-admin/users' 
-    },
-    { 
-      title: 'Active Sessions', 
-      value: stats.activeSessions || 0, 
-      icon: 'people', 
-      color: 'warning' 
-    },
+  if (loading && !data) {
+    return (
+      <div className="text-center py-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2 text-muted">Loading dashboard data...</p>
+      </div>
+    );
+  }
+
+  const stats = [
+    { title: 'Total Schools', value: data?.summary?.totalSchools || 0, icon: 'building', color: 'primary', link: '/super-admin/schools' },
+    { title: 'Total Admins', value: data?.summary?.totalAdmins || 0, icon: 'person-badge', color: 'info', link: '/super-admin/users?role=school_admin' },
+    { title: 'Total Teachers', value: data?.summary?.totalTeachers || 0, icon: 'mortarboard', color: 'success', link: '/super-admin/users?role=teacher' },
+    { title: 'Total Learners', value: data?.summary?.totalLearners || 0, icon: 'people', color: 'warning', link: '/super-admin/users?role=learner' },
   ];
 
   return (
     <>
+      {/* Stats Cards */}
       <Row className="g-3 mb-4">
-        {loading ? (
-          // Loading skeleton
-          superAdminStats.map((_, index) => (
-            <Col key={index} xs={12} sm={6} lg={3}>
-              <Card className="border-0 shadow-sm h-100">
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <div className="placeholder-glow">
-                        <div className="placeholder col-4 mb-2"></div>
-                        <h2 className="placeholder-glow">
-                          <span className="placeholder col-6"></span>
-                        </h2>
-                      </div>
-                    </div>
-                    <div className="bg-light p-3 rounded">
-                      <div className="placeholder" style={{width: '24px', height: '24px'}}></div>
-                    </div>
+        {stats.map((stat, index) => (
+          <Col key={index} xs={12} sm={6} lg={3}>
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h6 className="text-muted mb-2 small text-uppercase fw-bold">{stat.title}</h6>
+                    <h2 className="fw-bold mb-0">{stat.value.toLocaleString()}</h2>
                   </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))
-        ) : (
-          // Actual stats
-          superAdminStats.map((stat, index) => (
-            <Col key={index} xs={12} sm={6} lg={3}>
-              <Card className="border-0 shadow-sm h-100">
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <h6 className="text-muted mb-2">{stat.title}</h6>
-                      <h2 className="fw-bold mb-0">{stat.value}</h2>
-                    </div>
-                    <div className={`bg-${stat.color}-subtle p-3 rounded`}>
-                      <i className={`bi bi-${stat.icon} fs-4 text-${stat.color}`}></i>
-                    </div>
+                  <div className={`bg-${stat.color}-subtle p-3 rounded`}>
+                    <i className={`bi bi-${stat.icon} fs-4 text-${stat.color}`}></i>
                   </div>
-                  {stat.link && (
-                    <Button 
-                      as={Link} 
-                      to={stat.link} 
-                      variant="link" 
-                      className="p-0 mt-2 text-decoration-none"
-                    >
-                      View details <i className="bi bi-arrow-right ms-1"></i>
-                    </Button>
-                  )}
-                </Card.Body>
-              </Card>
-            </Col>
-          ))
-        )}
+                </div>
+                <Button 
+                  as={Link} 
+                  to={stat.link} 
+                  variant="link" 
+                  className="p-0 mt-3 text-decoration-none small"
+                >
+                  View Details <i className="bi bi-arrow-right ms-1"></i>
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        ))}
       </Row>
 
       <Row className="g-4">
+        {/* Recent Activity */}
         <Col lg={8}>
           <Card className="border-0 shadow-sm h-100">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <Card.Title className="mb-0">Recent Activity</Card.Title>
-                <Button 
-                  variant="outline-secondary" 
-                  size="sm"
-                  onClick={fetchStats}
-                  disabled={loading}
-                >
-                  <i className="bi bi-arrow-clockwise me-1"></i>
-                  Refresh
+            <Card.Header className="bg-white border-0 py-3">
+              <div className="d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Recent Platform Activity</h5>
+                <Button variant="outline-primary" size="sm" onClick={fetchStats} disabled={loading}>
+                  {loading ? <Spinner size="sm" animation="border" /> : <i className="bi bi-arrow-clockwise"></i>}
                 </Button>
               </div>
-              
-              {loading ? (
-                <div className="py-3">
-                  {[1, 2, 3, 4, 5].map((item) => (
-                    <div key={item} className="d-flex align-items-center mb-3">
-                      <div className="placeholder-glow">
-                        <span className="placeholder rounded-circle" style={{width: '40px', height: '40px'}}></span>
-                      </div>
-                      <div className="ms-3 flex-grow-1">
-                        <div className="placeholder-glow">
-                          <span className="placeholder col-6"></span>
-                          <span className="placeholder col-4 d-block mt-1"></span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="list-group list-group-flush">
-                  {stats.recentActivity && stats.recentActivity.length > 0 ? (
-                    stats.recentActivity.map((activity, index) => (
-                      <div key={index} className="list-group-item border-0 px-0 py-2">
-                        <div className="d-flex align-items-center">
-                          <div className="flex-shrink-0">
-                            <div className="bg-light rounded-circle p-2">
-                              <i className={`bi bi-${getActivityIcon(activity.action_type)} text-primary`}></i>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="table-responsive">
+                <Table hover className="align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th className="ps-4">Action</th>
+                      <th>User</th>
+                      <th>School</th>
+                      <th>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.recentActivity?.length > 0 ? (
+                      data.recentActivity.map((activity, index) => (
+                        <tr key={index}>
+                          <td className="ps-4">
+                            <div className="d-flex align-items-center">
+                              <div className="bg-light rounded-circle p-2 me-3">
+                                <i className={`bi bi-${getActivityIcon(activity.action_type)} text-primary`}></i>
+                              </div>
+                              <div>
+                                <div className="fw-bold small">{formatActivityType(activity.action_type)}</div>
+                                <div className="text-muted extra-small">{activity.action_type}</div>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex-grow-1 ms-3">
-                            <h6 className="mb-0">{formatActivity(activity.action_type)}</h6>
-                            <small className="text-muted">{activity.email}</small>
-                          </div>
-                          <small className="text-muted">
-                            {new Date(activity.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </small>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-4">
-                      <i className="bi bi-activity fs-1 text-muted mb-2"></i>
-                      <p className="text-muted">No recent activity</p>
-                    </div>
-                  )}
-                </div>
-              )}
+                          </td>
+                          <td>
+                            <div className="small fw-semibold">{activity.first_name} {activity.last_name}</div>
+                            <div className="text-muted extra-small">{activity.email}</div>
+                          </td>
+                          <td className="small">{activity.school_name || <span className="text-muted">N/A</span>}</td>
+                          <td className="small text-muted">
+                            {formatRelativeTime(activity.created_at)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="text-center py-5 text-muted">No recent activity recorded</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </Table>
+              </div>
             </Card.Body>
           </Card>
         </Col>
-        
+
+        {/* Distribution & Growth */}
         <Col lg={4}>
-          <Card className="border-0 shadow-sm h-100">
+          <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
-              <Card.Title className="mb-3">Quick Actions</Card.Title>
-              <div className="d-grid gap-2">
-                <Button as={Link} to="/super-admin/schools" variant="primary">
-                  <i className="bi bi-building me-2"></i>
-                  Manage Schools
-                </Button>
-                <Button as={Link} to="/super-admin/users" variant="outline-primary">
-                  <i className="bi bi-person-plus me-2"></i>
-                  Manage Users
-                </Button>
-                <Button as={Link} to="/super-admin/curricula" variant="outline-secondary">
-                  <i className="bi bi-book me-2"></i>
-                  Manage Curricula
-                </Button>
-                <Button 
-                  variant="outline-info"
-                  onClick={fetchStats}
-                  disabled={loading}
-                >
-                  <i className="bi bi-arrow-clockwise me-2"></i>
-                  {loading ? 'Refreshing...' : 'Refresh Data'}
-                </Button>
+              <h5 className="mb-4">Learner Distribution</h5>
+              {data?.gradeDistribution?.length > 0 ? (
+                data.gradeDistribution.map((item, index) => (
+                  <div key={index} className="mb-3">
+                    <div className="d-flex justify-content-between mb-1 small">
+                      <span>Grade {item.grade}</span>
+                      <span className="fw-bold">{item.count}</span>
+                    </div>
+                    <ProgressBar 
+                      now={(item.count / data.summary.totalLearners) * 100} 
+                      variant={getGradeVariant(item.grade)} 
+                      style={{height: '6px'}}
+                    />
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted py-3">No data available</p>
+              )}
+            </Card.Body>
+          </Card>
+
+          <Card className="border-0 shadow-sm">
+            <Card.Body>
+              <h5 className="mb-4">Quick Insights</h5>
+              <div className="d-flex align-items-center mb-4">
+                <div className="bg-primary-subtle p-3 rounded me-3 text-center" style={{width: '60px'}}>
+                  <h4 className="mb-0 fw-bold">{data?.summary?.activeUsers24h}</h4>
+                </div>
+                <div>
+                  <h6 className="mb-0 fw-bold">Active Users</h6>
+                  <small className="text-muted">In the last 24 hours</small>
+                </div>
               </div>
               
-              {/* System Status */}
-              <div className="mt-4 pt-3 border-top">
-                <h6 className="mb-3">System Status</h6>
-                <div className="d-flex align-items-center mb-2">
-                  <i className="bi bi-check-circle-fill text-success me-2"></i>
-                  <span>All systems operational</span>
-                </div>
-                <div className="d-flex align-items-center">
-                  <i className="bi bi-database text-primary me-2"></i>
-                  <span>{stats.totalSchools} schools active</span>
+              <div className="alert alert-info border-0 mb-0">
+                <div className="d-flex">
+                  <i className="bi bi-info-circle-fill me-2 mt-1"></i>
+                  <div className="small">
+                    <strong>Growth Note:</strong> 
+                    {data?.growth?.length > 0 ? 
+                      ` You added ${data.growth[data.growth.length - 1].count} schools this month.` : 
+                      ' No new schools added recently.'}
+                  </div>
                 </div>
               </div>
             </Card.Body>
@@ -297,60 +231,78 @@ const SuperAdminDashboard = () => {
   );
 };
 
-// Helper functions for SuperAdminDashboard
-const getActivityIcon = (actionType) => {
+// Helper components & functions
+const getActivityIcon = (type) => {
   const icons = {
-    'login': 'box-arrow-in-right',
-    'logout': 'box-arrow-right',
-    'create': 'plus-circle',
-    'update': 'pencil',
-    'delete': 'trash',
-    'view': 'eye'
+    'LOGIN': 'box-arrow-in-right',
+    'USER_CREATED': 'person-plus',
+    'SCHOOL_CREATED': 'plus-square',
+    'CURRICULUM_ASSIGNED': 'book',
+    'ASSESSMENT_CREATED': 'clipboard-plus',
+    'GRADES_SUBMITTED': 'check2-circle',
+    'WORKSHEET_GENERATED': 'magic',
+    'LEARNER_CREATED': 'person-plus-fill'
   };
-  return icons[actionType] || 'activity';
+  return icons[type] || 'activity';
 };
 
-const formatActivity = (actionType) => {
-  const actions = {
-    'login': 'User logged in',
-    'logout': 'User logged out',
-    'create': 'New item created',
-    'update': 'Item updated',
-    'delete': 'Item deleted',
-    'view': 'Item viewed'
-  };
-  return actions[actionType] || 'Activity performed';
+const formatActivityType = (type) => {
+  return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+};
+
+const formatRelativeTime = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInMinutes = Math.floor((now - date) / 60000);
+  
+  if (diffInMinutes < 1) return 'Just now';
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+  return date.toLocaleDateString();
+};
+
+const getGradeVariant = (grade) => {
+  const variants = { 'R': 'secondary', '1': 'success', '2': 'primary', '3': 'info' };
+  return variants[grade] || 'dark';
 };
 
 const SchoolAdminDashboard = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/school-admin/dashboard');
+      if (response.data.status === 'success') {
+        setData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch school admin dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !data) {
+    return (
+      <div className="text-center py-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2 text-muted">Loading school data...</p>
+      </div>
+    );
+  }
+
   const stats = [
-    { 
-      title: 'Total Teachers', 
-      value: '24', 
-      icon: 'person-badge', 
-      color: 'primary', 
-      link: '/school-admin/teachers' 
-    },
-    { 
-      title: 'Total Learners', 
-      value: '480', 
-      icon: 'people', 
-      color: 'success', 
-      link: '/school-admin/learners' 
-    },
-    { 
-      title: 'Active Classes', 
-      value: '16', 
-      icon: 'collection', 
-      color: 'info', 
-      link: '/school-admin/classes' 
-    },
-    { 
-      title: 'Avg. Performance', 
-      value: '78%', 
-      icon: 'graph-up', 
-      color: 'warning' 
-    },
+    { title: 'Total Teachers', value: data?.summary?.totalTeachers || 0, icon: 'person-badge', color: 'primary', link: '/school-admin/teachers' },
+    { title: 'Total Learners', value: data?.summary?.totalLearners || 0, icon: 'people', color: 'success', link: '/school-admin/learners' },
+    { title: 'Active Classes', value: data?.summary?.activeClasses || 0, icon: 'collection', color: 'info', link: '/school-admin/classes' },
+    { title: 'Avg. Performance', value: `${data?.summary?.averagePerformance || 0}%`, icon: 'graph-up', color: 'warning', link: '/school-admin/reports' },
   ];
 
   return (
@@ -362,7 +314,7 @@ const SchoolAdminDashboard = () => {
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-start">
                   <div>
-                    <h6 className="text-muted mb-2">{stat.title}</h6>
+                    <h6 className="text-muted mb-2 small text-uppercase fw-bold">{stat.title}</h6>
                     <h2 className="fw-bold mb-0">{stat.value}</h2>
                   </div>
                   <div className={`bg-${stat.color}-subtle p-3 rounded`}>
@@ -370,8 +322,8 @@ const SchoolAdminDashboard = () => {
                   </div>
                 </div>
                 {stat.link && (
-                  <Button as={Link} to={stat.link} variant="link" className="p-0 mt-2 text-decoration-none">
-                    View details <i className="bi bi-arrow-right ms-1"></i>
+                  <Button as={Link} to={stat.link} variant="link" className="p-0 mt-3 text-decoration-none small">
+                    Manage <i className="bi bi-arrow-right ms-1"></i>
                   </Button>
                 )}
               </Card.Body>
@@ -381,38 +333,86 @@ const SchoolAdminDashboard = () => {
       </Row>
 
       <Row className="g-4">
-        <Col lg={8}>
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <Card.Title className="mb-3">Performance Overview</Card.Title>
-              <div className="text-center py-5">
-                <i className="bi bi-bar-chart fs-1 text-muted"></i>
-                <p className="text-muted mt-2">Performance chart will be displayed here</p>
+        {/* Recent Activity */}
+        <Col lg={7}>
+          <Card className="border-0 shadow-sm h-100">
+            <Card.Header className="bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Recent School Activity</h5>
+              <Button variant="link" size="sm" onClick={fetchData} className="text-decoration-none">
+                <i className="bi bi-arrow-clockwise me-1"></i> Refresh
+              </Button>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="table-responsive">
+                <Table hover className="align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th className="ps-4">Activity</th>
+                      <th>User</th>
+                      <th>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.recentActivity?.length > 0 ? (
+                      data.recentActivity.map((activity, index) => (
+                        <tr key={index}>
+                          <td className="ps-4">
+                            <div className="fw-semibold small">{formatActivityType(activity.action_type)}</div>
+                            <div className="text-muted extra-small">{activity.action_type}</div>
+                          </td>
+                          <td>
+                            <div className="small">{activity.first_name} {activity.last_name}</div>
+                            <Badge bg="light" text="dark" className="extra-small border">
+                              {activity.role === 'teacher' ? 'Teacher' : 'Staff'}
+                            </Badge>
+                          </td>
+                          <td className="small text-muted">{formatRelativeTime(activity.created_at)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="3" className="text-center py-5 text-muted">No recent activity</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </Table>
               </div>
             </Card.Body>
           </Card>
         </Col>
         
-        <Col lg={4}>
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <Card.Title className="mb-3">Recent Registrations</Card.Title>
+        {/* Recently Created Classes */}
+        <Col lg={5}>
+          <Card className="border-0 shadow-sm h-100">
+            <Card.Header className="bg-white border-0 py-3">
+              <h5 className="mb-0">Recently Added Classes</h5>
+            </Card.Header>
+            <Card.Body className="p-0">
               <div className="list-group list-group-flush">
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="list-group-item border-0 px-0 py-2">
-                    <div className="d-flex align-items-center">
-                      <div className="flex-shrink-0">
-                        <div className="bg-light rounded-circle p-2">
-                          <i className="bi bi-person-plus text-success"></i>
+                {data?.recentClasses?.length > 0 ? (
+                  data.recentClasses.map((cls, index) => (
+                    <div key={index} className="list-group-item border-0 px-4 py-3">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                          <h6 className="mb-1">{cls.class_name}</h6>
+                          <div className="text-muted small">
+                            Grade {cls.grade_level} • {cls.student_count} Students
+                          </div>
+                        </div>
+                        <div className="text-end text-muted small">
+                          {cls.teacher_name || 'Unassigned'}
                         </div>
                       </div>
-                      <div className="flex-grow-1 ms-3">
-                        <h6 className="mb-0">New teacher joined</h6>
-                        <small className="text-muted">Mr. John Smith</small>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <div className="text-center py-5 text-muted">No classes created recently</div>
+                )}
+              </div>
+              <div className="p-3 border-top text-center">
+                <Button as={Link} to="/school-admin/classes" variant="link" className="text-decoration-none small">
+                  View All Classes <i className="bi bi-arrow-right ms-1"></i>
+                </Button>
               </div>
             </Card.Body>
           </Card>

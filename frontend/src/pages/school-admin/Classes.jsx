@@ -374,11 +374,15 @@ const Classes = () => {
 
   const prepareLearnerPerformanceData = () => {
     if (!classAnalytics?.learner_performance) return [];
-    return classAnalytics.learner_performance.map(learner => ({
-      name: `${learner.first_name} ${learner.last_name.substring(0, 1)}.`,
-      score: parseFloat(learner.average_percentage) || 0,
-      topics: learner.topics_covered || 0
-    })).sort((a, b) => b.score - a.score).slice(0, 10);
+    return classAnalytics.learner_performance.map(learner => {
+      const lastName = learner.last_name || '';
+      const initial = lastName ? `${lastName.substring(0, 1)}.` : '';
+      return {
+        name: `${learner.first_name} ${initial}`,
+        score: parseFloat(learner.average_percentage) || 0,
+        topics: learner.topics_covered || 0
+      };
+    }).sort((a, b) => b.score - a.score).slice(0, 10);
   };
 
   return (

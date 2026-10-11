@@ -13,7 +13,8 @@ class User {
       role,
       school_id,
       phone,
-      profile_image_url
+      profile_image_url,
+      is_active = true
     } = userData;
 
     // Hash password
@@ -23,9 +24,9 @@ class User {
     const query = `
       INSERT INTO users (
         email, password_hash, first_name, last_name, role, 
-        school_id, phone, profile_image_url
+        school_id, phone, profile_image_url, is_active
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
       RETURNING 
         user_id, email, first_name, last_name, role, 
         school_id, phone, profile_image_url, is_active, created_at
@@ -38,8 +39,9 @@ class User {
       last_name,
       role,
       school_id,
-      phone,
-      profile_image_url
+      phone || null,
+      profile_image_url || null,
+      is_active
     ];
 
     try {
@@ -267,39 +269,6 @@ static async getBySchoolAndRole(schoolId, role, page = 1, limit = 20, search = '
     limit,
     totalPages: Math.ceil(parseInt(countResult.rows[0].count) / limit)
   };
-}
-
-// Create user with password
-static async create(userData) {
-  const { email, password, first_name, last_name, role, school_id, phone } = userData;
-  
-  // Hash password
-  const bcrypt = await import('bcryptjs');
-  const salt = await bcrypt.genSalt(10);
-  const passwordHash = await bcrypt.hash(password, salt);
-  
-  const pool = await import('../config/database.js').then(mod => mod.default);
-  
-  const query = `
-    INSERT INTO users (
-      email, password_hash, first_name, last_name, 
-      role, school_id, phone, is_active
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, true)
-    RETURNING *
-  `;
-  
-  const result = await pool.query(query, [
-    email,
-    passwordHash,
-    first_name,
-    last_name,
-    role,
-    school_id,
-    phone || null
-  ]);
-  
-  return result.rows[0];
 }
 
   // Deactivate user

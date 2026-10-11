@@ -15,5 +15,6 @@ router.post('/reset-password', authController.resetPassword);
 // Protected routes - use the correct protect middleware
 router.get('/profile', protect, authController.getProfile);
 router.put('/profile', protect, authController.updateProfile);
+router.post('/logout', protect, authController.logout);
 
 export default router;

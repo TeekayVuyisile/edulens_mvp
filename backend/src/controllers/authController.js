@@ -251,26 +251,21 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-// Middleware to protect routes
-export const protect = async (req, res, next) => {
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+export const logout = async (req, res) => {
   try {
-    // Implementation similar to authMiddleware
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'No token provided'
-      });
-    }
-
-    // Verify token and attach user to request
-    // (This would use jwt.verify)
-    next();
+    // In a JWT system, client-side logout is primary.
+    // Server-side can handle session clearing if using cookies.
+    res.status(200).json({
+      status: 'success',
+      message: 'Logged out successfully'
+    });
   } catch (error) {
-    res.status(401).json({
+    res.status(500).json({
       status: 'error',
-      message: 'Not authorized'
+      message: 'Logout failed'
     });
   }
 };

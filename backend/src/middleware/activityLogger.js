@@ -27,40 +27,42 @@ export const activityLogger = async (req, res, next) => {
 };
 
 async function logActivity(req, res, duration) {
-  try {
-    // Skip logging for health checks and static files
-    if (req.path === '/api/health' || req.path.includes('.')) {
-      return;
+  // Fire and forget - don't await to avoid blocking the request cycle
+  Promise.resolve().then(async () => {
+    try {
+      // Skip logging for health checks and static files
+      if (req.path === '/api/health' || req.path.includes('.')) {
+        return;
+      }
+
+      const userId = req.user?.userId;
+      const schoolId = req.user?.schoolId;
+
+      const actionDetails = {
+        method: req.method,
+        path: req.path,
+        query: req.query,
+        body: req.method === 'POST' || req.method === 'PUT' ? req.body : null,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`
+      };
+
+      const query = `
+        INSERT INTO activity_logs 
+        (user_id, school_id, action_type, action_details, ip_address, user_agent)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `;
+
+      await pool.query(query, [
+        userId || null,
+        schoolId || null,
+        `${req.method} ${req.path}`,
+        JSON.stringify(actionDetails),
+        req.ip,
+        req.get('user-agent')
+      ]);
+    } catch (error) {
+      console.error('Error logging activity:', error);
     }
-
-    const userId = req.user?.userId;
-    const schoolId = req.user?.schoolId;
-
-    const actionDetails = {
-      method: req.method,
-      path: req.path,
-      query: req.query,
-      body: req.method === 'POST' || req.method === 'PUT' ? req.body : null,
-      statusCode: res.statusCode,
-      duration: `${duration}ms`
-    };
-
-    const query = `
-      INSERT INTO activity_logs 
-      (user_id, school_id, action_type, action_details, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `;
-
-    await pool.query(query, [
-      userId,
-      schoolId,
-      `${req.method} ${req.path}`,
-      JSON.stringify(actionDetails),
-      req.ip,
-      req.get('user-agent')
-    ]);
-  } catch (error) {
-    console.error('Error logging activity:', error);
-    // Don't throw error - logging failures shouldn't affect the main request
-  }
+  });
 }

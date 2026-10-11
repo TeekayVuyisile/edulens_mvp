@@ -1,9 +1,10 @@
 import jwt from 'jsonwebtoken';
+import pool from '../config/database.js';
 
 export const protect = (roles = []) => {
   return async (req, res, next) => {
     try {
-      // Get token from header
+      // 1. Get token from header
       const authHeader = req.headers.authorization;
       
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -15,13 +16,49 @@ export const protect = (roles = []) => {
 
       const token = authHeader.split(' ')[1];
 
-      // Verify token
+      // 2. Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Attach user to request
+      // 3. Verify user and school status in Database
+      // This is a security layer to catch deactivated accounts immediately
+      const statusQuery = `
+        SELECT u.is_active as user_active, s.is_active as school_active, u.role
+        FROM users u
+        LEFT JOIN schools s ON u.school_id = s.school_id
+        WHERE u.user_id = $1
+      `;
+      
+      const statusResult = await pool.query(statusQuery, [decoded.userId]);
+      
+      if (statusResult.rows.length === 0) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'User no longer exists'
+        });
+      }
+      
+      const { user_active, school_active, role } = statusResult.rows[0];
+      
+      if (!user_active) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Account has been deactivated'
+        });
+      }
+      
+      // If user belongs to a school, school must be active
+      // Super admins don't have a school_id in this context usually
+      if (role !== 'super_admin' && school_active === false) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Your school access has been suspended'
+        });
+      }
+
+      // 4. Attach user to request
       req.user = decoded;
 
-      // Check if user has required role
+      // 5. Check if user has required role
       if (roles.length > 0 && !roles.includes(decoded.role)) {
         return res.status(403).json({
           status: 'error',
@@ -45,6 +82,7 @@ export const protect = (roles = []) => {
         });
       }
 
+      console.error('Auth middleware error:', error);
       return res.status(500).json({
         status: 'error',
         message: 'Authentication failed'

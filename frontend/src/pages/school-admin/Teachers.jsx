@@ -17,12 +17,13 @@ const Teachers = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [importFile, setImportFile] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [currentTeacher, setCurrentTeacher] = useState(null);
-  const [assignedClasses, setAssignedClasses] = useState([]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [currentTeacher, setCurrentTeacher] = useState(null);
+  const [assignedClasses, setAssignedClasses] = useState([]);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const fileInputRef = useRef(null);
 
@@ -65,18 +66,31 @@ const Teachers = () => {
   ];
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page on new search
     fetchTeachers();
-  }, [currentPage]);
+  }, [currentPage, debouncedSearch]);
 
   const fetchTeachers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/school-admin/teachers?page=${currentPage}&limit=20&search=${searchTerm}`);
+      const response = await axios.get(`/api/school-admin/teachers`, {
+        params: {
+          page: currentPage,
+          limit: 20,
+          search: debouncedSearch
+        }
+      });
       setTeachers(response.data.data.users || []);
       setTotalPages(response.data.data.totalPages || 1);
     } catch (error) {
       toast.error('Failed to fetch teachers');
-      console.error('Fetch teachers error:', error);
     } finally {
       setLoading(false);
     }

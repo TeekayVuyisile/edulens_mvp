@@ -6,7 +6,6 @@ import {
 } from 'react-bootstrap';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
-import Layout from '../../components/common/Layout';
 
 const AssessmentGradebook = () => {
   const { assessmentId } = useParams();
@@ -209,30 +208,26 @@ const AssessmentGradebook = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <Container className="py-5">
-          <div className="text-center">
-            <Spinner animation="border" variant="primary" />
-            <p className="mt-2">Loading gradebook...</p>
-          </div>
-        </Container>
-      </Layout>
+      <Container className="py-5">
+        <div className="text-center">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-2">Loading gradebook...</p>
+        </div>
+      </Container>
     );
   }
 
   if (!assessment) {
     return (
-      <Layout>
-        <Container className="py-5">
-          <Alert variant="danger">
-            <Alert.Heading>Assessment not found</Alert.Heading>
-            <p>The assessment you're trying to access does not exist or you don't have permission to view it.</p>
-            <Button variant="primary" onClick={() => navigate('/teacher/assessments')}>
-              Back to Assessments
-            </Button>
-          </Alert>
-        </Container>
-      </Layout>
+      <Container className="py-5">
+        <Alert variant="danger">
+          <Alert.Heading>Assessment not found</Alert.Heading>
+          <p>The assessment you're trying to access does not exist or you don't have permission to view it.</p>
+          <Button variant="primary" onClick={() => navigate('/teacher/assessments')}>
+            Back to Assessments
+          </Button>
+        </Alert>
+      </Container>
     );
   }
 
@@ -241,301 +236,166 @@ const AssessmentGradebook = () => {
   const completionPercentage = totalCount > 0 ? (gradedCount / totalCount * 100) : 0;
 
   return (
-    <Layout>
-      <Container fluid className="py-4">
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <h1 className="h3 mb-2">Gradebook: {assessment.assessment_name}</h1>
-            <p className="text-muted">
-              {assessment.class_name} • Term {assessment.term_number} • Total Marks: {assessment.total_marks}
-              {assessment.subject_name && ` • ${assessment.subject_name}`}
-            </p>
-          </div>
-          <div className="d-flex gap-2">
-            <Button variant="outline-secondary" onClick={() => navigate('/teacher/assessments')}>
-              <i className="bi bi-arrow-left me-2"></i>
-              Back to Assessments
-            </Button>
-            <Button variant="primary" onClick={() => setShowBulkModal(true)}>
-              <i className="bi bi-pencil-square me-2"></i>
-              Quick Grade All
-            </Button>
-          </div>
+    <Container fluid className="py-4">
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 className="h3 mb-2">Gradebook: {assessment.assessment_name}</h1>
+          <p className="text-muted">
+            {assessment.class_name} • Term {assessment.term_number} • Total Marks: {assessment.total_marks}
+            {assessment.subject_name && ` • ${assessment.subject_name}`}
+          </p>
         </div>
+        <div className="d-flex gap-2">
+          <Button variant="outline-secondary" onClick={() => navigate('/teacher/assessments')}>
+            <i className="bi bi-arrow-left me-2"></i>
+            Back to Assessments
+          </Button>
+          <Button variant="primary" onClick={() => setShowBulkModal(true)}>
+            <i className="bi bi-pencil-square me-2"></i>
+            Quick Grade All
+          </Button>
+        </div>
+      </div>
 
-        <Card className="border-0 shadow-sm mb-4">
-          <Card.Body>
-            <div className="mb-4">
-              <Row className="g-3">
-                <Col md={4}>
-                  <div className="text-center p-3 border rounded bg-light">
-                    <div className="h2 mb-0 text-primary">{totalCount}</div>
-                    <small className="text-muted">Total Learners</small>
-                  </div>
-                </Col>
-                <Col md={4}>
-                  <div className="text-center p-3 border rounded bg-light">
-                    <div className="h2 mb-0 text-success">{gradedCount}</div>
-                    <small className="text-muted">Graded</small>
-                  </div>
-                </Col>
-                <Col md={4}>
-                  <div className="text-center p-3 border rounded bg-light">
-                    <div className="h2 mb-0 text-info">{Math.round(completionPercentage)}%</div>
-                    <small className="text-muted">Completion</small>
-                  </div>
-                </Col>
-              </Row>
-              <div className="mt-3">
-                <ProgressBar
-                  now={completionPercentage}
-                  variant={completionPercentage === 100 ? 'success' : completionPercentage > 50 ? 'info' : 'warning'}
-                  label={`${Math.round(completionPercentage)}%`}
-                  style={{ height: '10px' }}
-                />
-              </div>
+      <Card className="border-0 shadow-sm mb-4">
+        <Card.Body>
+          <div className="mb-4">
+            <Row className="g-3">
+              <Col md={4}>
+                <div className="text-center p-3 border rounded bg-light">
+                  <div className="h2 mb-0 text-primary">{totalCount}</div>
+                  <small className="text-muted">Total Learners</small>
+                </div>
+              </Col>
+              <Col md={4}>
+                <div className="text-center p-3 border rounded bg-light">
+                  <div className="h2 mb-0 text-success">{gradedCount}</div>
+                  <small className="text-muted">Graded</small>
+                </div>
+              </Col>
+              <Col md={4}>
+                <div className="text-center p-3 border rounded bg-light">
+                  <div className="h2 mb-0 text-info">{Math.round(completionPercentage)}%</div>
+                  <small className="text-muted">Completion</small>
+                </div>
+              </Col>
+            </Row>
+            <div className="mt-3">
+              <ProgressBar
+                now={completionPercentage}
+                variant={completionPercentage === 100 ? 'success' : completionPercentage > 50 ? 'info' : 'warning'}
+                label={`${Math.round(completionPercentage)}%`}
+                style={{ height: '10px' }}
+              />
             </div>
+          </div>
 
-            {gradebook.length === 0 ? (
-              <Alert variant="warning" className="text-center py-4">
-                <i className="bi bi-people display-4 text-muted mb-3"></i>
-                <h4>No Learners Found</h4>
-                <p className="text-muted">There are no learners in this class or there was an error fetching learners.</p>
-                <Button variant="primary" onClick={fetchGradebook}>
-                  <i className="bi bi-arrow-clockwise me-2"></i>
-                  Refresh Data
-                </Button>
-              </Alert>
-            ) : (
-              <>
-                <div className="table-responsive">
-                  <Table hover className="align-middle">
-                    <thead className="table-light">
-                      <tr>
-                        <th>#</th>
-                        <th>Learner</th>
-                        <th>Marks Obtained / {assessment.total_marks}</th>
-                        <th>Percentage</th>
-                        <th>Grade</th>
-                        <th>Status</th>
-                        <th>Feedback</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gradebook.map((item, index) => {
-                        const percentage = item.marks_obtained !== null && item.marks_obtained !== undefined
-                          ? (item.marks_obtained / assessment.total_marks * 100).toFixed(1)
-                          : null;
-                        
-                        const hasError = validationErrors[item.learner_id];
-                        
-                        return (
-                          <tr key={item.learner_id} className={hasError ? 'table-warning' : ''}>
-                            <td className="text-muted">{index + 1}</td>
-                            <td>
-                              <div>
-                                <strong>{item.first_name} {item.last_name}</strong>
-                                <div className="text-muted small">{item.email}</div>
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ maxWidth: '150px' }}>
-                                <Form.Control
-                                  type="number"
-                                  value={item.marks_obtained !== null && item.marks_obtained !== undefined ? item.marks_obtained : ''}
-                                  onChange={(e) => handleGradeChange(item.learner_id, e.target.value)}
-                                  min="0"
-                                  max={assessment.total_marks}
-                                  step="0.5"
-                                  isInvalid={!!hasError}
-                                  placeholder="Enter marks"
-                                />
-                                {hasError && (
-                                  <Form.Control.Feedback type="invalid" className="d-block">
-                                    <small>{hasError}</small>
-                                  </Form.Control.Feedback>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              {percentage ? (
-                                <Badge bg={getGradeColor(percentage)} className="px-3 py-2">
-                                  {percentage}%
-                                </Badge>
-                              ) : (
-                                <span className="text-muted">-</span>
-                              )}
-                            </td>
-                            <td>
-                              {percentage ? (
-                                <Badge bg="dark" className="px-3 py-2" style={{ fontSize: '0.9rem' }}>
-                                  {calculateGradeLetter(percentage)}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted">-</span>
-                              )}
-                            </td>
-                            <td>
-                              <Badge bg={item.is_graded ? 'success' : 'warning'} className="px-3 py-2">
-                                {item.is_graded ? 'Graded' : 'Pending'}
-                              </Badge>
-                              {item.graded_at && (
-                                <div className="text-muted small mt-1">
-                                  <i className="bi bi-calendar me-1"></i>
-                                  {new Date(item.graded_at).toLocaleDateString()}
-                                </div>
-                              )}
-                            </td>
-                            <td>
-                              <Form.Control
-                                as="textarea"
-                                rows={2}
-                                value={item.teacher_feedback || ''}
-                                onChange={(e) => {
-                                  const updated = gradebook.map(g => 
-                                    g.learner_id === item.learner_id 
-                                      ? { ...g, teacher_feedback: e.target.value }
-                                      : g
-                                  );
-                                  setGradebook(updated);
-                                }}
-                                placeholder="Add constructive feedback..."
-                                style={{ fontSize: '0.9rem', minWidth: '200px' }}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </Table>
-                </div>
-
-                <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                  <div>
-                    <Button
-                      variant="outline-secondary"
-                      onClick={() => navigate('/teacher/assessments')}
-                      className="me-2"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="outline-primary"
-                      onClick={fetchGradebook}
-                    >
-                      <i className="bi bi-arrow-clockwise me-2"></i>
-                      Refresh
-                    </Button>
-                  </div>
-                  <div>
-                    <Button
-                      variant="primary"
-                      onClick={handleSaveGrades}
-                      disabled={saving}
-                      size="lg"
-                    >
-                      {saving ? (
-                        <>
-                          <Spinner size="sm" animation="border" className="me-2" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <i className="bi bi-save me-2"></i>
-                          Save All Grades
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
-          </Card.Body>
-        </Card>
-
-        {/* Bulk Grading Modal */}
-        <Modal show={showBulkModal} onHide={() => setShowBulkModal(false)} size="lg" centered>
-          <Modal.Header closeButton className="bg-primary text-white">
-            <Modal.Title>
-              <i className="bi bi-pencil-square me-2"></i>
-              Quick Grade All Learners
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Alert variant="info" className="mb-3">
-              <i className="bi bi-lightbulb me-2"></i>
-              Enter marks for all learners quickly. Leave blank for learners you don't want to grade yet.
-              <br />
-              <strong>Maximum marks:</strong> {assessment.total_marks}
+          {gradebook.length === 0 ? (
+            <Alert variant="warning" className="text-center py-4">
+              <i className="bi bi-people display-4 text-muted mb-3"></i>
+              <h4>No Learners Found</h4>
+              <p className="text-muted">There are no learners in this class or there was an error fetching learners.</p>
+              <Button variant="primary" onClick={fetchGradebook}>
+                <i className="bi bi-arrow-clockwise me-2"></i>
+                Refresh Data
+              </Button>
             </Alert>
-            
-            {gradebook.length === 0 ? (
-              <Alert variant="warning" className="text-center py-4">
-                <i className="bi bi-people display-4 text-muted mb-3"></i>
-                <p>No learners found to grade.</p>
-              </Alert>
-            ) : (
-              <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <Table size="sm" className="mb-0">
-                  <thead className="sticky-top bg-white">
+          ) : (
+            <>
+              <div className="table-responsive">
+                <Table hover className="align-middle">
+                  <thead className="table-light">
                     <tr>
                       <th>#</th>
-                      <th>Learner Name</th>
-                      <th>Marks (0-{assessment.total_marks})</th>
-                      <th>Error</th>
+                      <th>Learner</th>
+                      <th>Marks Obtained / {assessment.total_marks}</th>
+                      <th>Percentage</th>
+                      <th>Grade</th>
+                      <th>Status</th>
+                      <th>Feedback</th>
                     </tr>
                   </thead>
                   <tbody>
                     {gradebook.map((item, index) => {
-                      const error = validationErrors[item.learner_id];
+                      const percentage = item.marks_obtained !== null && item.marks_obtained !== undefined
+                        ? (item.marks_obtained / assessment.total_marks * 100).toFixed(1)
+                        : null;
+                      
+                      const hasError = validationErrors[item.learner_id];
+                      
                       return (
-                        <tr key={item.learner_id} className={error ? 'table-warning' : ''}>
+                        <tr key={item.learner_id} className={hasError ? 'table-warning' : ''}>
                           <td className="text-muted">{index + 1}</td>
                           <td>
-                            {item.first_name} {item.last_name}
-                            <div className="text-muted small">{item.email}</div>
+                            <div>
+                              <strong>{item.first_name} {item.last_name}</strong>
+                              <div className="text-muted small">{item.email}</div>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ maxWidth: '150px' }}>
+                              <Form.Control
+                                type="number"
+                                value={item.marks_obtained !== null && item.marks_obtained !== undefined ? item.marks_obtained : ''}
+                                onChange={(e) => handleGradeChange(item.learner_id, e.target.value)}
+                                min="0"
+                                max={assessment.total_marks}
+                                step="0.5"
+                                isInvalid={!!hasError}
+                                placeholder="Enter marks"
+                              />
+                              {hasError && (
+                                <Form.Control.Feedback type="invalid" className="d-block">
+                                  <small>{hasError}</small>
+                                </Form.Control.Feedback>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            {percentage ? (
+                              <Badge bg={getGradeColor(percentage)} className="px-3 py-2">
+                                {percentage}%
+                              </Badge>
+                            ) : (
+                              <span className="text-muted">-</span>
+                            )}
+                          </td>
+                          <td>
+                            {percentage ? (
+                              <Badge bg="dark" className="px-3 py-2" style={{ fontSize: '0.9rem' }}>
+                                {calculateGradeLetter(percentage)}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted">-</span>
+                            )}
+                          </td>
+                          <td>
+                            <Badge bg={item.is_graded ? 'success' : 'warning'} className="px-3 py-2">
+                              {item.is_graded ? 'Graded' : 'Pending'}
+                            </Badge>
+                            {item.graded_at && (
+                              <div className="text-muted small mt-1">
+                                <i className="bi bi-calendar me-1"></i>
+                                {new Date(item.graded_at).toLocaleDateString()}
+                              </div>
+                            )}
                           </td>
                           <td>
                             <Form.Control
-                              type="number"
-                              size="sm"
-                              value={bulkScores[item.learner_id] || ''}
+                              as="textarea"
+                              rows={2}
+                              value={item.teacher_feedback || ''}
                               onChange={(e) => {
-                                const newScores = {
-                                  ...bulkScores,
-                                  [item.learner_id]: e.target.value
-                                };
-                                setBulkScores(newScores);
-                                
-                                // Validate on change
-                                if (e.target.value !== '') {
-                                  const validationError = validateMark(e.target.value, assessment.total_marks);
-                                  if (validationError) {
-                                    setValidationErrors(prev => ({
-                                      ...prev,
-                                      [item.learner_id]: validationError
-                                    }));
-                                  } else {
-                                    setValidationErrors(prev => {
-                                      const newErrors = { ...prev };
-                                      delete newErrors[item.learner_id];
-                                      return newErrors;
-                                    });
-                                  }
-                                }
+                                const updated = gradebook.map(g => 
+                                  g.learner_id === item.learner_id 
+                                    ? { ...g, teacher_feedback: e.target.value }
+                                    : g
+                                );
+                                setGradebook(updated);
                               }}
-                              min="0"
-                              max={assessment.total_marks}
-                              step="0.5"
-                              style={{ width: '120px' }}
-                              placeholder="Enter marks"
-                              isInvalid={!!error}
+                              placeholder="Add constructive feedback..."
+                              style={{ fontSize: '0.9rem', minWidth: '200px' }}
                             />
-                          </td>
-                          <td>
-                            {error && (
-                              <small className="text-danger">{error}</small>
-                            )}
                           </td>
                         </tr>
                       );
@@ -543,29 +403,162 @@ const AssessmentGradebook = () => {
                   </tbody>
                 </Table>
               </div>
+
+              <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                <div>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => navigate('/teacher/assessments')}
+                    className="me-2"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="outline-primary"
+                    onClick={fetchGradebook}
+                  >
+                    <i className="bi bi-arrow-clockwise me-2"></i>
+                    Refresh
+                  </Button>
+                </div>
+                <div>
+                  <Button
+                    variant="primary"
+                    onClick={handleSaveGrades}
+                    disabled={saving}
+                    size="lg"
+                  >
+                    {saving ? (
+                      <>
+                        <Spinner size="sm" animation="border" className="me-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-save me-2"></i>
+                        Save All Grades
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* Bulk Grading Modal */}
+      <Modal show={showBulkModal} onHide={() => setShowBulkModal(false)} size="lg" centered>
+        <Modal.Header closeButton className="bg-primary text-white">
+          <Modal.Title>
+            <i className="bi bi-pencil-square me-2"></i>
+            Quick Grade All Learners
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="info" className="mb-3">
+            <i className="bi bi-lightbulb me-2"></i>
+            Enter marks for all learners quickly. Leave blank for learners you don't want to grade yet.
+            <br />
+            <strong>Maximum marks:</strong> {assessment.total_marks}
+          </Alert>
+          
+          {gradebook.length === 0 ? (
+            <Alert variant="warning" className="text-center py-4">
+              <i className="bi bi-people display-4 text-muted mb-3"></i>
+              <p>No learners found to grade.</p>
+            </Alert>
+          ) : (
+            <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <Table size="sm" className="mb-0">
+                <thead className="sticky-top bg-white">
+                  <tr>
+                    <th>#</th>
+                    <th>Learner Name</th>
+                    <th>Marks (0-{assessment.total_marks})</th>
+                    <th>Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gradebook.map((item, index) => {
+                    const error = validationErrors[item.learner_id];
+                    return (
+                      <tr key={item.learner_id} className={error ? 'table-warning' : ''}>
+                        <td className="text-muted">{index + 1}</td>
+                        <td>
+                          {item.first_name} {item.last_name}
+                          <div className="text-muted small">{item.email}</div>
+                        </td>
+                        <td>
+                          <Form.Control
+                            type="number"
+                            size="sm"
+                            value={bulkScores[item.learner_id] || ''}
+                            onChange={(e) => {
+                              const newScores = {
+                                ...bulkScores,
+                                [item.learner_id]: e.target.value
+                              };
+                              setBulkScores(newScores);
+                              
+                              // Validate on change
+                              if (e.target.value !== '') {
+                                const validationError = validateMark(e.target.value, assessment.total_marks);
+                                if (validationError) {
+                                  setValidationErrors(prev => ({
+                                    ...prev,
+                                    [item.learner_id]: validationError
+                                  }));
+                                } else {
+                                  setValidationErrors(prev => {
+                                    const newErrors = { ...prev };
+                                    delete newErrors[item.learner_id];
+                                    return newErrors;
+                                  });
+                                }
+                              }
+                            }}
+                            min="0"
+                            max={assessment.total_marks}
+                            step="0.5"
+                            style={{ width: '120px' }}
+                            placeholder="Enter marks"
+                            isInvalid={!!error}
+                          />
+                        </td>
+                        <td>
+                          {error && (
+                            <small className="text-danger">{error}</small>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => {
+            setShowBulkModal(false);
+            setValidationErrors({});
+          }}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleBulkGradeSubmit} disabled={saving || gradebook.length === 0}>
+            {saving ? (
+              <>
+                <Spinner size="sm" animation="border" className="me-2" />
+                Saving...
+              </>
+            ) : (
+              'Save Grades'
             )}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="outline-secondary" onClick={() => {
-              setShowBulkModal(false);
-              setValidationErrors({});
-            }}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleBulkGradeSubmit} disabled={saving || gradebook.length === 0}>
-              {saving ? (
-                <>
-                  <Spinner size="sm" animation="border" className="me-2" />
-                  Saving...
-                </>
-              ) : (
-                'Save Grades'
-              )}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      </Container>
-    </Layout>
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </Container>
   );
 };
 

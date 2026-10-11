@@ -1529,6 +1529,78 @@ export const uploadAssessmentResource = async (req, res) => {
   }
 };
 
+// @desc    Get worksheet details
+// @route   GET /api/teacher/worksheets/history/:requestId
+// @access  Private (Teacher)
+export const getWorksheetDetails = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const teacherId = req.user.userId;
+
+    const query = `
+      SELECT 
+        wr.*,
+        c.curriculum_name,
+        s.subject_name,
+        t.topic_name
+      FROM worksheet_requests wr
+      LEFT JOIN curricula c ON wr.curriculum_id = c.curriculum_id
+      LEFT JOIN subjects s ON wr.subject_id = s.subject_id
+      LEFT JOIN topics t ON wr.topic_id = t.topic_id
+      WHERE wr.request_id = $1 AND wr.teacher_id = $2
+    `;
+
+    const result = await pool.query(query, [requestId, teacherId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Worksheet not found'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: { worksheet: result.rows[0] }
+    });
+  } catch (error) {
+    console.error('Get worksheet details error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get worksheet details'
+    });
+  }
+};
+
+// @desc    Get saved worksheets from library
+// @route   GET /api/teacher/worksheets/saved
+// @access  Private (Teacher)
+export const getSavedWorksheets = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, shared, search } = req.query;
+
+    const filters = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      shared: shared === 'true',
+      search
+    };
+
+    const result = await Worksheet.getSavedWorksheets(req.user.userId, filters);
+
+    res.status(200).json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    console.error('Get saved worksheets error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get saved worksheets'
+    });
+  }
+};
+
 // @desc    Delete assessment resource
 // @route   DELETE /api/teacher/assessments/:assessmentId/resources/:resourceId
 // @access  Private (Teacher)

@@ -48,9 +48,15 @@ class School {
   // Get all schools with pagination
   static async getAll(page = 1, limit = 20, filters = {}) {
     const offset = (page - 1) * limit;
-    const conditions = ['is_active = true'];
+    const conditions = [];
     const values = [];
     let paramCount = 1;
+
+    if (filters.is_active !== undefined) {
+      conditions.push(`is_active = $${paramCount}`);
+      values.push(filters.is_active);
+      paramCount++;
+    }
 
     if (filters.search) {
       conditions.push(`(school_name ILIKE $${paramCount} OR school_code ILIKE $${paramCount})`);

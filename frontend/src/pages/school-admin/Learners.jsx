@@ -86,36 +86,38 @@ const Learners = () => {
     return maxDate.toISOString().split('T')[0];
   };
 
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page on new search/filter
     fetchLearners();
     fetchClasses();
-  }, [currentPage, activeTab, filterClass]);
+  }, [currentPage, activeTab, filterClass, debouncedSearch]);
 
   const fetchLearners = async () => {
     try {
       setLoading(true);
-      let url = `/api/school-admin/learners?page=${currentPage}&limit=20`;
-      
-      if (searchTerm) {
-        url += `&search=${searchTerm}`;
-      }
-      if (activeTab) {
-        url += `&status=${activeTab}`;
-      }
-      if (filterClass) {
-        url += `&class_id=${filterClass}`;
-      }
-
-      const response = await axios.get(url);
+      const response = await axios.get(`/api/school-admin/learners`, {
+        params: {
+          page: currentPage,
+          limit: 20,
+          status: activeTab,
+          class_id: filterClass,
+          search: debouncedSearch
+        }
+      });
       setLearners(response.data.data.learners || []);
       setTotalPages(response.data.data.totalPages || 1);
     } catch (error) {
       console.error('Fetch learners error:', error);
-      if (error.response?.status === 400) {
-        toast.error('Invalid request parameters');
-      } else {
-        toast.error('Failed to fetch learners');
-      }
+      toast.error('Failed to fetch learners');
     } finally {
       setLoading(false);
     }

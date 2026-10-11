@@ -35,13 +35,16 @@ const Curricula = () => {
   });
   const [editFormData, setEditFormData] = useState({});
 
+  const [includeInactive, setIncludeInactive] = useState(false);
+
   useEffect(() => {
     fetchCurricula();
-  }, []);
+  }, [includeInactive]);
 
   const fetchCurricula = async () => {
     try {
-      const response = await axios.get('/api/super-admin/curricula');
+      setLoading(true);
+      const response = await axios.get(`/api/super-admin/curricula?include_inactive=${includeInactive}`);
       setCurricula(response.data.data.curricula || []);
     } catch (error) {
       toast.error('Failed to fetch curricula');
@@ -144,6 +147,24 @@ const Curricula = () => {
       resetSelection();
     } catch (error) {
       toast.error(error.response?.data?.message || `Failed to delete ${selectedItemType}`);
+    }
+  };
+
+  const handleToggleActive = async (id, type, currentStatus) => {
+    try {
+      let endpoint = '';
+      switch (type) {
+        case 'curriculum': endpoint = `/api/super-admin/curricula/${id}`; break;
+        case 'subject': endpoint = `/api/super-admin/subjects/${id}`; break;
+        case 'topic': endpoint = `/api/super-admin/topics/${id}`; break;
+        default: return;
+      }
+      
+      await axios.put(endpoint, { is_active: !currentStatus });
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} ${!currentStatus ? 'reactivated' : 'deactivated'} successfully`);
+      fetchCurricula();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update status');
     }
   };
 
@@ -291,7 +312,7 @@ const Curricula = () => {
       <Card className="border-0 shadow-sm mb-4">
         <Card.Body>
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <div className="w-100 me-3">
+            <div className="flex-grow-1 me-3">
               <InputGroup>
                 <InputGroup.Text>
                   <i className="bi bi-search"></i>
@@ -303,6 +324,14 @@ const Curricula = () => {
                 />
               </InputGroup>
             </div>
+            <Form.Check 
+              type="switch"
+              id="show-inactive-switch"
+              label="Show Inactive"
+              checked={includeInactive}
+              onChange={(e) => setIncludeInactive(e.target.checked)}
+              className="text-nowrap"
+            />
           </div>
 
           {loading ? (
@@ -374,17 +403,19 @@ const Curricula = () => {
                                     </div>
                                   </div>
                                   <div className="d-flex gap-2">
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline-success"
-                                      onClick={() => {
-                                        setSelectedSubject(subject.subject_id);
-                                        setShowTopicModal(true);
-                                      }}
-                                    >
-                                      <i className="bi bi-plus me-1"></i>
-                                      Add Topic
-                                    </Button>
+                                    {subject.is_active && (
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline-success"
+                                        onClick={() => {
+                                          setSelectedSubject(subject.subject_id);
+                                          setShowTopicModal(true);
+                                        }}
+                                      >
+                                        <i className="bi bi-plus me-1"></i>
+                                        Add Topic
+                                      </Button>
+                                    )}
                                     <Button 
                                       size="sm" 
                                       variant="outline-warning"
@@ -401,17 +432,27 @@ const Curricula = () => {
                                     >
                                       <i className="bi bi-pencil"></i>
                                     </Button>
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline-danger"
-                                      onClick={() => handleDeleteClick(
-                                        subject.subject_id, 
-                                        'subject',
-                                        subject.subject_name
-                                      )}
-                                    >
-                                      <i className="bi bi-trash"></i>
-                                    </Button>
+                                    {subject.is_active ? (
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline-danger"
+                                        onClick={() => handleDeleteClick(
+                                          subject.subject_id, 
+                                          'subject',
+                                          subject.subject_name
+                                        )}
+                                      >
+                                        <i className="bi bi-trash"></i>
+                                      </Button>
+                                    ) : (
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline-success"
+                                        onClick={() => handleToggleActive(subject.subject_id, 'subject', false)}
+                                      >
+                                        <i className="bi bi-arrow-counterclockwise"></i>
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                                 
@@ -421,16 +462,15 @@ const Curricula = () => {
                                     <Row className="g-2">
                                       {subject.topics.map((topic) => (
                                         <Col key={topic.topic_id} xs={12} md={6} lg={4}>
-                                          <Card className="border bg-light">
+                                          <Card className={`border ${topic.is_active ? 'bg-light' : 'bg-secondary-subtle'}`}>
                                             <Card.Body className="p-3">
                                               <div className="d-flex justify-content-between align-items-start">
                                                 <div>
-                                                  <strong className="small">{topic.topic_name}</strong>
+                                                  <strong className={`small ${!topic.is_active ? 'text-muted text-decoration-line-through' : ''}`}>
+                                                    {topic.topic_name}
+                                                  </strong>
                                                   <div className="text-muted extra-small">
                                                     {topic.topic_code}
-                                                    {topic.description && (
-                                                      <div>{topic.description}</div>
-                                                    )}
                                                   </div>
                                                 </div>
                                                 <div className="d-flex gap-1">
@@ -451,18 +491,29 @@ const Curricula = () => {
                                                   >
                                                     <i className="bi bi-pencil"></i>
                                                   </Button>
-                                                  <Button 
-                                                    size="sm" 
-                                                    variant="outline-danger"
-                                                    className="p-1"
-                                                    onClick={() => handleDeleteClick(
-                                                      topic.topic_id, 
-                                                      'topic',
-                                                      topic.topic_name
-                                                    )}
-                                                  >
-                                                    <i className="bi bi-trash"></i>
-                                                  </Button>
+                                                  {topic.is_active ? (
+                                                    <Button 
+                                                      size="sm" 
+                                                      variant="outline-danger"
+                                                      className="p-1"
+                                                      onClick={() => handleDeleteClick(
+                                                        topic.topic_id, 
+                                                        'topic',
+                                                        topic.topic_name
+                                                      )}
+                                                    >
+                                                      <i className="bi bi-trash"></i>
+                                                    </Button>
+                                                  ) : (
+                                                    <Button 
+                                                      size="sm" 
+                                                      variant="outline-success"
+                                                      className="p-1"
+                                                      onClick={() => handleToggleActive(topic.topic_id, 'topic', false)}
+                                                    >
+                                                      <i className="bi bi-arrow-counterclockwise"></i>
+                                                    </Button>
+                                                  )}
                                                 </div>
                                               </div>
                                             </Card.Body>
@@ -499,18 +550,29 @@ const Curricula = () => {
                         <i className="bi bi-pencil me-1"></i>
                         Edit Curriculum
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline-danger"
-                        onClick={() => handleDeleteClick(
-                          curriculum.curriculum_id, 
-                          'curriculum',
-                          curriculum.curriculum_name
-                        )}
-                      >
-                        <i className="bi bi-trash me-1"></i>
-                        Delete Curriculum
-                      </Button>
+                      {curriculum.is_active ? (
+                        <Button 
+                          size="sm" 
+                          variant="outline-danger"
+                          onClick={() => handleDeleteClick(
+                            curriculum.curriculum_id, 
+                            'curriculum',
+                            curriculum.curriculum_name
+                          )}
+                        >
+                          <i className="bi bi-trash me-1"></i>
+                          Delete Curriculum
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="outline-success"
+                          onClick={() => handleToggleActive(curriculum.curriculum_id, 'curriculum', false)}
+                        >
+                          <i className="bi bi-arrow-counterclockwise me-1"></i>
+                          Reactivate Curriculum
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline-secondary">
                         <i className="bi bi-eye me-1"></i>
                         View Details

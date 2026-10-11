@@ -215,7 +215,9 @@ function App() {
             path="/teacher/assessments/:assessmentId/gradebook"
             element={
               <ProtectedRoute allowedRoles={["teacher"]}>
-                <AssessmentGradebook />
+                <Layout>
+                  <AssessmentGradebook />
+                </Layout>
               </ProtectedRoute>
             }
           />

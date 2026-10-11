@@ -238,34 +238,86 @@ export const getPlatformStatistics = async (req, res) => {
   try {
     const pool = await import('../config/database.js').then(mod => mod.default);
     
-    const queries = {
-      totalSchools: `SELECT COUNT(*) FROM schools WHERE is_active = true`,
-      totalAdmins: `SELECT COUNT(*) FROM users WHERE role = 'school_admin' AND is_active = true`,
-      totalTeachers: `SELECT COUNT(*) FROM users WHERE role = 'teacher' AND is_active = true`,
-      totalLearners: `SELECT COUNT(*) FROM learners WHERE academic_status = 'active'`,
-      activeSessions: `SELECT COUNT(DISTINCT user_id) FROM activity_logs WHERE created_at > NOW() - INTERVAL '1 hour'`,
-      recentActivity: `
-        SELECT al.action_type, u.email, al.created_at
-        FROM activity_logs al
-        JOIN users u ON al.user_id = u.user_id
-        ORDER BY al.created_at DESC
-        LIMIT 10
-      `
-    };
+    // Get summary counts
+    const countsQuery = `
+      SELECT
+        (SELECT COUNT(*) FROM schools WHERE is_active = true) as total_schools,
+        (SELECT COUNT(*) FROM users WHERE role = 'school_admin' AND is_active = true) as total_admins,
+        (SELECT COUNT(*) FROM users WHERE role = 'teacher' AND is_active = true) as total_teachers,
+        (SELECT COUNT(*) FROM learners WHERE academic_status = 'active') as total_learners,
+        (SELECT COUNT(DISTINCT user_id) FROM activity_logs WHERE created_at > NOW() - INTERVAL '24 hours') as active_users_24h
+    `;
 
-    const results = await Promise.all(
-      Object.values(queries).map(query => pool.query(query))
-    );
+    // Get school growth (last 6 months)
+    const growthQuery = `
+      SELECT 
+        TO_CHAR(created_at, 'Mon YYYY') as month,
+        COUNT(*) as count,
+        MIN(created_at) as sort_date
+      FROM schools
+      WHERE created_at > NOW() - INTERVAL '6 months'
+      GROUP BY month
+      ORDER BY sort_date ASC
+    `;
+
+    // Get recent activity with user details
+    const activityQuery = `
+      SELECT 
+        al.action_type, 
+        u.email, 
+        u.first_name, 
+        u.last_name, 
+        u.role,
+        al.created_at,
+        al.action_details,
+        s.school_name
+      FROM activity_logs al
+      JOIN users u ON al.user_id = u.user_id
+      LEFT JOIN schools s ON u.school_id = s.school_id
+      ORDER BY al.created_at DESC
+      LIMIT 15
+    `;
+
+    // Get distribution of learners by grade
+    const gradeDistributionQuery = `
+      SELECT 
+        c.grade_level, 
+        COUNT(l.learner_id) as count
+      FROM learners l
+      JOIN classes c ON l.current_class_id = c.class_id
+      WHERE l.academic_status = 'active'
+      GROUP BY c.grade_level
+      ORDER BY c.grade_level
+    `;
+
+    const [countsResult, growthResult, activityResult, gradeResult] = await Promise.all([
+      pool.query(countsQuery),
+      pool.query(growthQuery),
+      pool.query(activityQuery),
+      pool.query(gradeDistributionQuery)
+    ]);
+
+    const counts = countsResult.rows[0];
 
     res.status(200).json({
       status: 'success',
       data: {
-        totalSchools: parseInt(results[0].rows[0].count),
-        totalAdmins: parseInt(results[1].rows[0].count),
-        totalTeachers: parseInt(results[2].rows[0].count),
-        totalLearners: parseInt(results[3].rows[0].count),
-        activeSessions: parseInt(results[4].rows[0].count),
-        recentActivity: results[5].rows
+        summary: {
+          totalSchools: parseInt(counts.total_schools),
+          totalAdmins: parseInt(counts.total_admins),
+          totalTeachers: parseInt(counts.total_teachers),
+          totalLearners: parseInt(counts.total_learners),
+          activeUsers24h: parseInt(counts.active_users_24h)
+        },
+        growth: growthResult.rows.map(row => ({
+          month: row.month,
+          count: parseInt(row.count)
+        })),
+        recentActivity: activityResult.rows,
+        gradeDistribution: gradeResult.rows.map(row => ({
+          grade: row.grade_level,
+          count: parseInt(row.count)
+        }))
       }
     });
   } catch (error) {
@@ -303,44 +355,52 @@ export const createCurriculum = async (req, res) => {
 // @access  Private (Super Admin)
 export const getCurricula = async (req, res) => {
   try {
-    const { search } = req.query;
-    const filters = search ? { search } : {};
+    const { include_inactive } = req.query;
+    const pool = await import('../config/database.js').then(mod => mod.default);
+    
+    // Comprehensive hierarchical query
+    const query = `
+      SELECT 
+        c.curriculum_id, c.curriculum_name, c.description, c.is_active,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'subject_id', s.subject_id,
+              'subject_name', s.subject_name,
+              'subject_code', s.subject_code,
+              'grade_level', s.grade_level,
+              'description', s.description,
+              'topics', (
+                SELECT COALESCE(json_agg(
+                  jsonb_build_object(
+                    'topic_id', t.topic_id,
+                    'topic_name', t.topic_name,
+                    'topic_code', t.topic_code,
+                    'description', t.description,
+                    'learning_objectives', t.learning_objectives
+                  )
+                ), '[]'::json)
+                FROM topics t
+                WHERE t.subject_id = s.subject_id AND t.is_active = true
+              )
+            )
+          ) FILTER (WHERE s.subject_id IS NOT NULL), 
+          '[]'::json
+        ) as subjects
+      FROM curricula c
+      LEFT JOIN subjects s ON c.curriculum_id = s.curriculum_id AND s.is_active = true
+      WHERE ($1 = 'true' OR c.is_active = true)
+      GROUP BY c.curriculum_id
+      ORDER BY c.curriculum_name ASC
+    `;
 
-    const curricula = await Curriculum.getAll(filters);
-
-    // Get subjects for each curriculum
-    const curriculaWithSubjects = await Promise.all(
-      curricula.map(async (curriculum) => {
-        const pool = await import('../config/database.js').then(mod => mod.default);
-        const subjectsResult = await pool.query(
-          `SELECT s.*, 
-            json_agg(
-              json_build_object(
-                'topic_id', t.topic_id,
-                'topic_name', t.topic_name,
-                'topic_code', t.topic_code,
-                'description', t.description,
-                'learning_objectives', t.learning_objectives
-              ) ORDER BY t.topic_name
-            ) as topics
-          FROM subjects s
-          LEFT JOIN topics t ON s.subject_id = t.subject_id AND t.is_active = true
-          WHERE s.curriculum_id = $1 AND s.is_active = true
-          GROUP BY s.subject_id
-          ORDER BY s.subject_name`,
-          [curriculum.curriculum_id]
-        );
-
-        return {
-          ...curriculum,
-          subjects: subjectsResult.rows
-        };
-      })
-    );
+    const result = await pool.query(query, [include_inactive || 'false']);
 
     res.status(200).json({
       status: 'success',
-      data: { curricula: curriculaWithSubjects }
+      data: {
+        curricula: result.rows
+      }
     });
   } catch (error) {
     console.error('Get curricula error:', error);

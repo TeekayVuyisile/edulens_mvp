@@ -334,6 +334,8 @@ router.post('/worksheets/save',
 );
 
 router.get('/worksheets/history', teacherController.getWorksheetHistory);
+router.get('/worksheets/history/:requestId', teacherController.getWorksheetDetails);
+router.get('/worksheets/saved', teacherController.getSavedWorksheets);
 
 // Learner Management
 router.get('/learners/:learnerId',

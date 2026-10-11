@@ -11,14 +11,30 @@ import xlsx from 'xlsx';
 export const getDashboard = async (req, res) => {
   try {
     const schoolId = req.user.schoolId;
-
-    // Get school statistics
-    const statistics = await School.getStatistics(schoolId);
-
-    // Get recent activity
     const pool = await import('../config/database.js').then(mod => mod.default);
+
+    // 1. Get summary counts
+    const countsQuery = `
+      SELECT
+        (SELECT COUNT(*) FROM users WHERE school_id = $1 AND role = 'teacher' AND is_active = true) as total_teachers,
+        (SELECT COUNT(*) FROM learners WHERE school_id = $1 AND academic_status = 'active') as total_learners,
+        (SELECT COUNT(*) FROM classes WHERE school_id = $1 AND is_active = true AND academic_year = $2) as active_classes,
+        (SELECT COALESCE(ROUND(AVG(g.percentage), 1), 0) 
+         FROM grades g 
+         JOIN assessments a ON g.assessment_id = a.assessment_id
+         JOIN classes c ON a.class_id = c.class_id
+         WHERE c.school_id = $1) as average_performance
+    `;
+
+    // 2. Get recent school activity
     const activityQuery = `
-      SELECT al.action_type, u.first_name, u.last_name, al.created_at
+      SELECT 
+        al.action_type, 
+        u.first_name, 
+        u.last_name, 
+        u.role,
+        al.created_at,
+        al.action_details
       FROM activity_logs al
       JOIN users u ON al.user_id = u.user_id
       WHERE al.school_id = $1
@@ -26,17 +42,40 @@ export const getDashboard = async (req, res) => {
       LIMIT 10
     `;
 
-    const activityResult = await pool.query(activityQuery, [schoolId]);
+    // 3. Get recent classes
+    const classesQuery = `
+      SELECT 
+        c.class_name, 
+        c.grade_level, 
+        u.first_name || ' ' || u.last_name as teacher_name,
+        (SELECT COUNT(*) FROM learners WHERE current_class_id = c.class_id) as student_count
+      FROM classes c
+      LEFT JOIN users u ON c.primary_teacher_id = u.user_id
+      WHERE c.school_id = $1 AND c.is_active = true
+      ORDER BY c.created_at DESC
+      LIMIT 5
+    `;
 
-    // Get recent classes
-    const classes = await ClassModel.getBySchool(schoolId, new Date().getFullYear());
+    const currentYear = new Date().getFullYear();
+    const [countsResult, activityResult, classesResult] = await Promise.all([
+      pool.query(countsQuery, [schoolId, currentYear]),
+      pool.query(activityQuery, [schoolId]),
+      pool.query(classesQuery, [schoolId])
+    ]);
+
+    const counts = countsResult.rows[0];
 
     res.status(200).json({
       status: 'success',
       data: {
-        statistics,
+        summary: {
+          totalTeachers: parseInt(counts.total_teachers),
+          totalLearners: parseInt(counts.total_learners),
+          activeClasses: parseInt(counts.active_classes),
+          averagePerformance: parseFloat(counts.average_performance)
+        },
         recentActivity: activityResult.rows,
-        recentClasses: classes.slice(0, 5)
+        recentClasses: classesResult.rows
       }
     });
   } catch (error) {
@@ -127,14 +166,13 @@ export const bulkImportTeachers = async (req, res) => {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       teachers = xlsx.utils.sheet_to_json(worksheet);
     } else {
-      fs.unlinkSync(filePath); // Clean up file
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       return res.status(400).json({
         status: 'error',
         message: 'Unsupported file format. Use CSV or Excel.'
       });
     }
 
-    // Process teachers
     const results = {
       total: teachers.length,
       success: 0,
@@ -142,13 +180,23 @@ export const bulkImportTeachers = async (req, res) => {
       errors: []
     };
 
-    const createdTeachers = [];
+    const pool = await import('../config/database.js').then(mod => mod.default);
+    const emailService = await import('../services/emailService.js').then(mod => mod.default);
 
     for (const [index, teacherData] of teachers.entries()) {
+      const client = await pool.connect();
       try {
+        await client.query('BEGIN');
+
         // Validate required fields
         if (!teacherData.email || !teacherData.first_name || !teacherData.last_name) {
           throw new Error('Missing required fields: email, first_name, last_name');
+        }
+
+        // Check if email already exists
+        const emailCheck = await client.query('SELECT user_id FROM users WHERE email = $1', [teacherData.email]);
+        if (emailCheck.rows.length > 0) {
+          throw new Error(`Email ${teacherData.email} already exists`);
         }
 
         // Generate temporary password
@@ -164,8 +212,7 @@ export const bulkImportTeachers = async (req, res) => {
           phone: teacherData.phone || null
         });
 
-        // Send welcome email
-        const emailService = await import('../services/emailService.js').then(mod => mod.default);
+        // Send welcome email (optional: could move this out of transaction or handle asynchronously)
         await emailService.sendWelcomeEmail(
           teacher.email,
           teacher.first_name,
@@ -173,27 +220,24 @@ export const bulkImportTeachers = async (req, res) => {
           tempPassword
         );
 
-        createdTeachers.push({
-          email: teacher.email,
-          temporary_password: tempPassword
-        });
-
+        await client.query('COMMIT');
         results.success++;
       } catch (error) {
+        await client.query('ROLLBACK');
         results.failed++;
         results.errors.push({
           row: index + 1,
-          email: teacherData.email,
+          email: teacherData.email || 'N/A',
           error: error.message
         });
+      } finally {
+        client.release();
       }
     }
 
-    // Clean up file
-    fs.unlinkSync(filePath);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    // Log import
-    const pool = await import('../config/database.js').then(mod => mod.default);
+    // Log import summary
     await pool.query(
       `INSERT INTO bulk_import_logs 
        (school_id, imported_by, import_type, file_name, total_records, 
@@ -213,10 +257,7 @@ export const bulkImportTeachers = async (req, res) => {
     res.status(200).json({
       status: 'success',
       message: `Import completed: ${results.success} successful, ${results.failed} failed`,
-      data: {
-        summary: results,
-        created_teachers: createdTeachers
-      }
+      data: { summary: results }
     });
 
   } catch (error) {
@@ -235,20 +276,53 @@ export const getTeachers = async (req, res) => {
   try {
     const schoolId = req.user.schoolId;
     const { page = 1, limit = 20, search } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const filters = {};
-    if (search) filters.search = search;
+    const pool = await import('../config/database.js').then(mod => mod.default);
+    
+    let query = `
+      SELECT 
+        u.user_id, u.email, u.first_name, u.last_name, u.phone, 
+        u.is_active, u.last_login, u.created_at,
+        COUNT(DISTINCT cta.class_id) as assigned_classes_count
+      FROM users u
+      LEFT JOIN class_teacher_assignments cta ON u.user_id = cta.teacher_id
+      WHERE u.school_id = $1 AND u.role = 'teacher'
+    `;
+    
+    const queryParams = [schoolId];
+    let paramCount = 2;
 
-    const result = await User.getBySchoolAndRole(
-      schoolId,
-      'teacher',
-      parseInt(page),
-      parseInt(limit)
-    );
+    if (search) {
+      query += ` AND (u.first_name ILIKE $${paramCount} OR u.last_name ILIKE $${paramCount} OR u.email ILIKE $${paramCount})`;
+      queryParams.push(`%${search}%`);
+      paramCount++;
+    }
+
+    query += ` GROUP BY u.user_id ORDER BY u.first_name, u.last_name LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    
+    const countQuery = `
+      SELECT COUNT(*) FROM users 
+      WHERE school_id = $1 AND role = 'teacher'
+      ${search ? `AND (first_name ILIKE $2 OR last_name ILIKE $2 OR email ILIKE $2)` : ''}
+    `;
+
+    const [teachersResult, countResult] = await Promise.all([
+      pool.query(query, [...queryParams, parseInt(limit), offset]),
+      pool.query(countQuery, search ? [schoolId, `%${search}%`] : [schoolId])
+    ]);
+
+    const total = parseInt(countResult.rows[0].count);
 
     res.status(200).json({
       status: 'success',
-      data: result
+      data: {
+        users: teachersResult.rows,
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
     console.error('Get teachers error:', error);
@@ -484,12 +558,12 @@ export const bulkImportLearners = async (req, res) => {
         const learnerResult = await client.query(learnerQuery, [
           userResult.rows[0].user_id,
           schoolId,
-          learnerData.current_class_id,
+          learnerData.current_class_id || null, // Coerce empty string to null
           learnerData.date_of_birth,
-          learnerData.gender,
-          learnerData.guardian_name,
-          learnerData.guardian_email,
-          learnerData.guardian_phone
+          learnerData.gender || null,
+          learnerData.guardian_name || null,
+          learnerData.guardian_email || null,
+          learnerData.guardian_phone || null
         ]);
 
         await client.query('COMMIT');
@@ -703,7 +777,7 @@ export const getClasses = async (req, res) => {
         u.last_name as primary_teacher_last_name,
         u.email as primary_teacher_email,
         CONCAT(u.first_name, ' ', u.last_name) as primary_teacher_name,
-        COUNT(DISTINCT l.learner_id) as learner_count,
+        COUNT(DISTINCT l.learner_id) as current_enrollment,
         COALESCE(AVG(g.percentage), 0) as average_score,
         COUNT(DISTINCT a.assessment_id) as assessments_count
       FROM classes c
@@ -905,19 +979,41 @@ export const getPerformanceReports = async (req, res) => {
 
     const pool = await import('../config/database.js').then(mod => mod.default);
 
-    // Get class performance
+    const year = academic_year || new Date().getFullYear();
+
+    // 1. Get high-level summary stats
+    const statsQuery = `
+      SELECT
+        (SELECT COUNT(*) FROM learners WHERE school_id = $1 AND academic_status = 'active') as total_learners,
+        (SELECT COALESCE(ROUND(AVG(g.percentage), 1), 0) 
+         FROM grades g 
+         JOIN assessments a ON g.assessment_id = a.assessment_id
+         JOIN classes c ON a.class_id = c.class_id
+         WHERE c.school_id = $1 AND c.academic_year = $2) as average_score,
+        (SELECT COUNT(*) FROM assessments a
+         JOIN classes c ON a.class_id = c.class_id
+         WHERE c.school_id = $1 AND c.academic_year = $2) as total_assessments,
+        (SELECT COUNT(*) FROM grades g
+         JOIN assessments a ON g.assessment_id = a.assessment_id
+         JOIN classes c ON a.class_id = c.class_id
+         WHERE c.school_id = $1 AND c.academic_year = $2 AND g.percentage >= 75) as distinctions_count
+    `;
+
+    // 2. Get class performance
     const classPerformanceQuery = `
       SELECT 
         c.class_id,
         c.class_name,
         c.grade_level,
+        u.first_name || ' ' || u.last_name as teacher_name,
         COUNT(DISTINCT l.learner_id) as total_learners,
         COUNT(DISTINCT a.assessment_id) as total_assessments,
-        ROUND(AVG(g.percentage), 2) as average_score,
+        COALESCE(ROUND(AVG(g.percentage), 1), 0) as average_score,
         COUNT(CASE WHEN g.percentage >= 75 THEN 1 END) as distinction_count,
         COUNT(CASE WHEN g.percentage >= 50 AND g.percentage < 75 THEN 1 END) as pass_count,
         COUNT(CASE WHEN g.percentage < 50 THEN 1 END) as fail_count
       FROM classes c
+      LEFT JOIN users u ON c.primary_teacher_id = u.user_id
       LEFT JOIN learners l ON c.class_id = l.current_class_id 
         AND l.academic_status = 'active'
       LEFT JOIN assessments a ON c.class_id = a.class_id
@@ -925,25 +1021,26 @@ export const getPerformanceReports = async (req, res) => {
       WHERE c.school_id = $1 
         AND c.is_active = true
         AND c.academic_year = $2
-        ${grade_level ? 'AND c.grade_level = $3' : ''}
-        ${term_number ? 'AND a.term_number = $4' : ''}
-      GROUP BY c.class_id, c.class_name, c.grade_level
-      ORDER BY c.grade_level, c.class_name
+        ${grade_level && grade_level !== 'all' ? 'AND c.grade_level = $3' : ''}
+        ${term_number && term_number !== 'all' ? `AND a.term_number = ${grade_level && grade_level !== 'all' ? '$4' : '$3'}` : ''}
+      GROUP BY c.class_id, c.class_name, c.grade_level, u.first_name, u.last_name
+      ORDER BY average_score DESC
     `;
 
-    const params = [schoolId, academic_year || new Date().getFullYear()];
-    if (grade_level) params.push(grade_level);
-    if (term_number) params.push(term_number);
+    const params = [schoolId, year];
+    if (grade_level && grade_level !== 'all') params.push(grade_level);
+    if (term_number && term_number !== 'all') params.push(term_number);
 
-    const classPerformanceResult = await pool.query(classPerformanceQuery, params);
+    const [statsResult, classPerformanceResult] = await Promise.all([
+      pool.query(statsQuery, [schoolId, year]),
+      pool.query(classPerformanceQuery, params)
+    ]);
 
-    // Get subject performance
+    // 3. Get subject performance
     const subjectPerformanceQuery = `
       SELECT 
         s.subject_name,
-        c.grade_level,
-        COUNT(DISTINCT a.assessment_id) as total_assessments,
-        ROUND(AVG(g.percentage), 2) as average_score,
+        COALESCE(ROUND(AVG(g.percentage), 1), 0) as average_score,
         COUNT(DISTINCT g.learner_id) as learners_assessed
       FROM assessments a
       JOIN classes c ON a.class_id = c.class_id
@@ -951,17 +1048,19 @@ export const getPerformanceReports = async (req, res) => {
       LEFT JOIN grades g ON a.assessment_id = g.assessment_id
       WHERE c.school_id = $1 
         AND c.academic_year = $2
-        ${grade_level ? 'AND c.grade_level = $3' : ''}
-        ${term_number ? 'AND a.term_number = $4' : ''}
-      GROUP BY s.subject_name, c.grade_level
-      ORDER BY s.subject_name, c.grade_level
+        ${grade_level && grade_level !== 'all' ? 'AND c.grade_level = $3' : ''}
+      GROUP BY s.subject_name
+      ORDER BY average_score DESC
     `;
 
-    const subjectPerformanceResult = await pool.query(subjectPerformanceQuery, params);
+    const subjectPerformanceResult = await pool.query(subjectPerformanceQuery, 
+      grade_level && grade_level !== 'all' ? [schoolId, year, grade_level] : [schoolId, year]
+    );
 
     res.status(200).json({
       status: 'success',
       data: {
+        summary: statsResult.rows[0],
         class_performance: classPerformanceResult.rows,
         subject_performance: subjectPerformanceResult.rows
       }
@@ -1601,14 +1700,17 @@ export const getClassCurriculum = async (req, res) => {
         s.subject_name,
         s.subject_code,
         s.grade_level,
-        json_agg(
-          json_build_object(
-            'topic_id', t.topic_id,
-            'topic_name', t.topic_name,
-            'topic_code', t.topic_code,
-            'description', t.description,
-            'learning_objectives', t.learning_objectives
-          ) ORDER BY t.topic_name
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'topic_id', t.topic_id,
+              'topic_name', t.topic_name,
+              'topic_code', t.topic_code,
+              'description', t.description,
+              'learning_objectives', t.learning_objectives
+            ) ORDER BY t.topic_name
+          ) FILTER (WHERE t.topic_id IS NOT NULL),
+          '[]'::json
         ) as topics
       FROM school_curriculum_assignments sca
       JOIN curricula c ON sca.curriculum_id = c.curriculum_id
