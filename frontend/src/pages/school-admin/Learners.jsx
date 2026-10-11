@@ -22,7 +22,6 @@ const Learners = () => {
   const [importing, setImporting] = useState(false);
   const [currentLearner, setCurrentLearner] = useState(null);
   const [classes, setClasses] = useState([]);
-  const [availableClasses, setAvailableClasses] = useState([]);
   const [learnerPerformance, setLearnerPerformance] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -270,7 +269,7 @@ const Learners = () => {
       }
       
       setShowDetailsModal(true);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch learner details');
     }
   };

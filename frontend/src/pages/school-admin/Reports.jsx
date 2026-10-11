@@ -20,7 +20,6 @@ ChartJS.register(
 
 const Reports = () => {
   const [loading, setLoading] = useState(true);
-  const [reportType, setReportType] = useState('performance');
   const [gradeLevel, setGradeLevel] = useState('all');
   const [term, setTerm] = useState('all');
   

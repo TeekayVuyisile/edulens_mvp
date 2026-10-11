@@ -1,8 +1,7 @@
 import React from 'react';
 import { Navbar, Nav, Container, Dropdown } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { toast } from 'react-hot-toast';
+import { useAuth } from '../../contexts/useAuth';
 
 const CustomNavbar = () => {
   const { user, logout } = useAuth();

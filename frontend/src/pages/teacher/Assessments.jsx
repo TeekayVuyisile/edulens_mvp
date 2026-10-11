@@ -58,7 +58,7 @@ const Assessments = () => {
     try {
       const response = await axios.get('/api/teacher/assessments');
       setAssessments(response.data.data.assessments || []);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch assessments');
     } finally {
       setLoading(false);
@@ -80,7 +80,7 @@ const Assessments = () => {
     try {
       const response = await axios.get(`/api/teacher/assessments/${assessmentId}`);
       setResources(response.data.data.resources || []);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch resources');
     }
   };

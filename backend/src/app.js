@@ -2,38 +2,35 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 // Import middleware
-import { activityLogger } from './src/middleware/activityLogger.js';
+import { activityLogger } from './middleware/activityLogger.js';
 
 // Import routes
-import authRoutes from './src/routes/authRoutes.js';
-import superAdminRoutes from './src/routes/superAdminRoutes.js';
-import schoolAdminRoutes from './src/routes/schoolAdminRoutes.js';
-import teacherRoutes from './src/routes/teacherRoutes.js';
-import curriculumRoutes from './src/routes/curriculumRoutes.js';
-import learnerRoutes from './src/routes/learnerRoutes.js';
-
-// Load environment variables
-dotenv.config();
+import authRoutes from './routes/authRoutes.js';
+import superAdminRoutes from './routes/superAdminRoutes.js';
+import schoolAdminRoutes from './routes/schoolAdminRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
+import curriculumRoutes from './routes/curriculumRoutes.js';
+import learnerRoutes from './routes/learnerRoutes.js';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const isTest = process.env.NODE_ENV === 'test';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Rate limiting
+// Rate limiting (disabled under test so suites can make many requests)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: Number(process.env.RATE_LIMIT_MAX) || 100, // limit each IP to max requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: () => isTest
 });
 
 // Apply rate limiting to all requests
@@ -72,10 +69,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// Activity logging middleware
-app.use(activityLogger);
+// Activity logging middleware (writes to the DB after each response; skipped under test)
+if (!isTest) {
+  app.use(activityLogger);
+}
 
 // Basic route for health check
 app.get('/api/health', (req, res) => {
@@ -106,6 +105,7 @@ app.use((req, res) => {
 });
 
 // Error handling middleware
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error('Error:', {
     message: err.message,
@@ -122,31 +122,6 @@ app.use((err, req, res, next) => {
     message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    process.exit(0);
-  });
-});
-
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`Edulens LMS server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-  console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
 });
 
 export default app;

@@ -1,6 +1,5 @@
 import User from '../models/User.js';
 import ClassModel from '../models/Class.js';
-import School from '../models/School.js';
 import { parse } from 'csv-parse/sync';
 import fs from 'fs';
 import xlsx from 'xlsx';

@@ -48,35 +48,6 @@ class EmailService {
     }
   }
 
-  async sendWelcomeEmail(email, firstName, role) {
-    const mailOptions = {
-      from: `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`,
-      to: email,
-      subject: 'Welcome to Edulens LMS!',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #4F46E5;">Welcome to Edulens LMS!</h2>
-          <p>Dear ${firstName},</p>
-          <p>Your account has been created successfully as a <strong>${role}</strong>.</p>
-          <p>You can now login to the system using your email address.</p>
-          <p>If you have any questions, please contact your school administrator.</p>
-          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-          <p style="color: #666; font-size: 12px;">
-            Edulens LMS - Empowering Teachers, Inspiring Learners
-          </p>
-        </div>
-      `
-    };
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-      return true;
-    } catch (error) {
-      console.error('Error sending welcome email:', error);
-      // Don't throw error for welcome email failures
-    }
-  }
-  // Add this method to backend/src/services/emailService.js
 async sendPasswordChangedNotification(email, firstName, lastName, superAdminContact) {
   const mailOptions = {
     from: `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`,
@@ -117,7 +88,7 @@ async sendPasswordChangedNotification(email, firstName, lastName, superAdminCont
   }
 }
 
-// Update sendWelcomeEmail to accept password info
+// passwordInfo is optional, e.g. a note about a temporary password
 async sendWelcomeEmail(email, firstName, role, passwordInfo) {
   const mailOptions = {
     from: `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`,
@@ -128,7 +99,7 @@ async sendWelcomeEmail(email, firstName, role, passwordInfo) {
         <h2 style="color: #4F46E5;">Welcome to Edulens LMS!</h2>
         <p>Dear ${firstName},</p>
         <p>Your account has been created successfully as a <strong>${role.replace('_', ' ')}</strong>.</p>
-        <p>${passwordInfo}</p>
+        ${passwordInfo ? `<p>${passwordInfo}</p>` : ''}
         <p>You can now login to the system using your email address.</p>
         <p>If you have any questions, please contact your school administrator or the system support team.</p>
         <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">

@@ -45,7 +45,6 @@ class Learner {
     if (academicYear) {
       conditions.push(`c.academic_year = $${paramCount}`);
       values.push(academicYear);
-      paramCount++;
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

@@ -1,75 +1,51 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import pool from './database.js';
 import bcrypt from 'bcryptjs';
+import pool from './database.js';
+import { runMigrations } from '../db/migrator.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const DEV_DEFAULT_ADMIN = { email: 'superadmin@edulens.com', password: 'Admin123!' };
+
+const createAdminUser = async () => {
+  let adminEmail = process.env.SUPER_ADMIN_EMAIL;
+  let adminPassword = process.env.SUPER_ADMIN_PASSWORD;
+
+  if (!adminEmail || !adminPassword) {
+    if (process.env.NODE_ENV === 'production') {
+      console.log('SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD not set; skipping super admin creation');
+      return;
+    }
+    adminEmail = DEV_DEFAULT_ADMIN.email;
+    adminPassword = DEV_DEFAULT_ADMIN.password;
+  }
+
+  const existingAdmin = await pool.query('SELECT 1 FROM users WHERE email = $1', [adminEmail]);
+  if (existingAdmin.rows.length > 0) {
+    console.log('Super admin already exists');
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
+  const result = await pool.query(
+    `INSERT INTO users (email, password_hash, first_name, last_name, role, is_active)
+     VALUES ($1, $2, 'Super', 'Admin', 'super_admin', true)
+     RETURNING user_id, email, role`,
+    [adminEmail, passwordHash]
+  );
+  console.log('Super admin created:', result.rows[0]);
+};
 
 const migrate = async () => {
   try {
     console.log('Starting database migration...');
+    const applied = await runMigrations(pool);
+    console.log(applied.length ? `Applied ${applied.length} migration(s).` : 'Database is up to date.');
 
-    // 1. Read SQL schema file
-    const sqlPath = path.join(__dirname, '../../../database/edulens_lms_database.sql');
-    const sqlSchema = fs.readFileSync(sqlPath, 'utf8');
-
-    // 2. Execute schema
-    // Note: This script executes the entire SQL file. 
-    // In a production environment, you would use a migration tool like 'knex' or 'db-migrate'.
-    console.log('Executing schema from edulens_lms_database.sql...');
-    await pool.query(sqlSchema);
-    console.log('Schema executed successfully.');
-
-    // 3. Create Super Admin user
     await createAdminUser();
-
     console.log('Migration completed successfully.');
   } catch (error) {
-    console.error('Migration failed:', error);
-    process.exit(1);
+    console.error('Migration failed:', error.message);
+    process.exitCode = 1;
   } finally {
     await pool.end();
-  }
-};
-
-const createAdminUser = async () => {
-  try {
-    const adminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@edulens.com';
-    const adminPassword = process.env.SUPER_ADMIN_PASSWORD || 'Admin123!';
-
-    // Check if super admin already exists
-    const checkQuery = 'SELECT * FROM users WHERE email = $1';
-    const existingAdmin = await pool.query(checkQuery, [adminEmail]);
-    
-    if (existingAdmin.rows.length === 0) {
-      const passwordHash = await bcrypt.hash(adminPassword, 10);
-      
-      const insertQuery = `
-        INSERT INTO users (
-          email, password_hash, first_name, last_name, role, is_active
-        ) 
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING user_id, email, first_name, last_name, role
-      `;
-      
-      const result = await pool.query(insertQuery, [
-        adminEmail,
-        passwordHash,
-        'Super',
-        'Admin',
-        'super_admin',
-        true
-      ]);
-      
-      console.log('Super admin created successfully:', result.rows[0]);
-    } else {
-      console.log('Super admin already exists');
-    }
-  } catch (error) {
-    console.error('Error creating super admin:', error);
-    throw error;
   }
 };
 

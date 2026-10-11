@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Form, Button, Card, Row, Col, Tab, Nav } from 'react-bootstrap';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 const Profile = () => {
   const { user, updateProfile } = useAuth();

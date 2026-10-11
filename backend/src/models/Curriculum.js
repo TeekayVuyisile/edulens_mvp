@@ -10,7 +10,6 @@ class Curriculum {
     if (filters.search) {
       conditions.push(`curriculum_name ILIKE $${paramCount}`);
       values.push(`%${filters.search}%`);
-      paramCount++;
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

@@ -2,7 +2,7 @@ import React from "react";
 import { Container } from "react-bootstrap";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "../../contexts/useAuth";
 
 const Layout = ({ children }) => {
   const { user } = useAuth();
