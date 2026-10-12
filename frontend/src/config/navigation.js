@@ -5,6 +5,7 @@ import {
   LuChartColumn,
   LuClipboardList,
   LuFileText,
+  LuHeart,
   LuLayoutDashboard,
   LuSchool,
   LuUsers,
@@ -15,6 +16,7 @@ export const ROLE_LABELS = {
   super_admin: 'Super Admin',
   school_admin: 'School Admin',
   teacher: 'Teacher',
+  parent: 'Parent',
 };
 
 /**
@@ -46,6 +48,7 @@ export const NAVIGATION = {
       ],
     },
   ],
+  parent: [{ heading: 'Overview', items: [{ to: '/dashboard', label: 'My children', icon: LuHeart }] }],
   teacher: [
     { heading: 'Overview', items: [{ to: '/dashboard', label: 'Dashboard', icon: LuLayoutDashboard }] },
     {

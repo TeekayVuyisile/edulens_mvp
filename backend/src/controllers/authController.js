@@ -2,9 +2,9 @@ import crypto from 'crypto';
 import User from '../models/User.js';
 import emailService from '../services/emailService.js';
 
-// Roles that may sign in. Learner records still carry legacy user rows, but
-// learners never sign in (guardians will get their own portal).
-const SIGN_IN_ROLES = ['super_admin', 'school_admin', 'teacher'];
+// Roles that may sign in.
+// Learners never sign in; their parents and guardians use the parent portal.
+const SIGN_IN_ROLES = ['super_admin', 'school_admin', 'teacher', 'parent'];
 
 const RESET_REQUESTED_MESSAGE =
   'If an account exists with this email, you will receive a password reset link';

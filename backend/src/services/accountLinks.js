@@ -15,6 +15,7 @@ export const ROLE_LABELS = {
   super_admin: 'Super Admin',
   school_admin: 'School Admin',
   teacher: 'Teacher',
+  parent: 'Parent',
 };
 
 const frontendUrl = () => (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');

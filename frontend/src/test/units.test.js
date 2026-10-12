@@ -31,8 +31,8 @@ describe('errorMessage', () => {
 });
 
 describe('navigation', () => {
-  it('has no learner section (learners do not sign in)', () => {
-    expect(Object.keys(NAVIGATION).sort()).toEqual(['school_admin', 'super_admin', 'teacher']);
+  it('has no learner section (learners do not sign in; parents do)', () => {
+    expect(Object.keys(NAVIGATION).sort()).toEqual(['parent', 'school_admin', 'super_admin', 'teacher']);
   });
 
   it('gives every role a dashboard link and unique paths', () => {

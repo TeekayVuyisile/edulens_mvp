@@ -104,3 +104,4 @@ export const requireSuperAdmin = protect(['super_admin']);
 export const requireSchoolAdmin = protect(['school_admin']);
 export const requireTeacher = protect(['teacher']);
 export const requireAdminOrTeacher = protect(['school_admin', 'teacher']);
+export const requireParent = protect(['parent']);

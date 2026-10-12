@@ -21,6 +21,7 @@ import FullPageLoader from '../../components/ui/FullPageLoader';
 import LearnerFormModal from '../../components/learners/LearnerFormModal';
 import MoveLearnerModal from './components/MoveLearnerModal';
 import LearnerStatusDialogs from './components/LearnerStatusDialogs';
+import ParentAccessPanel from './components/ParentAccessPanel';
 
 const LearnerDetail = () => {
   const { learnerId } = useParams();
@@ -108,6 +109,7 @@ const LearnerDetail = () => {
         <div className="el-stack">
           <DetailsPanel learner={learner} />
           <GuardianPanel learner={learner} onEdit={() => setDialog({ type: 'edit' })} />
+          <ParentAccessPanel learner={learner} />
           <SupportPanel learner={learner} />
         </div>
       </div>

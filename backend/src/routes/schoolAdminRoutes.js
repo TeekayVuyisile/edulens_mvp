@@ -11,11 +11,12 @@ import * as learners from '../controllers/schoolAdmin/learnersController.js';
 import * as classes from '../controllers/schoolAdmin/classesController.js';
 import { getPerformance } from '../controllers/schoolAdmin/reportsController.js';
 import * as yearEnd from '../controllers/schoolAdmin/yearEndController.js';
+import * as guardians from '../controllers/schoolAdmin/guardiansController.js';
 import { OUTCOMES } from '../services/yearEnd.js';
 
 const router = express.Router();
 
-validateUuidParams(router, ['classId', 'learnerId', 'teacherId']);
+validateUuidParams(router, ['classId', 'guardianId', 'learnerId', 'teacherId']);
 
 router.use(requireSchoolAdmin);
 
@@ -102,6 +103,19 @@ router.patch('/learners/:learnerId/status', validate([
 router.patch('/learners/:learnerId/class', validate([
   body('class_id').optional({ values: 'null' }).isUUID().withMessage('Choose a class'),
 ]), learners.setLearnerClass);
+
+// ---- Parents and guardians -------------------------------------------------------
+
+router.get('/learners/:learnerId/guardians', guardians.listGuardians);
+router.post('/learners/:learnerId/guardians', validate([
+  email(),
+  body('first_name').optional({ values: 'falsy' }).isString().trim().isLength({ max: 100 }),
+  body('last_name').optional({ values: 'falsy' }).isString().trim().isLength({ max: 100 }),
+  phone('phone'),
+  body('relationship').optional({ values: 'falsy' }).isString().trim().isLength({ max: 50 }),
+]), guardians.inviteGuardian);
+router.post('/learners/:learnerId/guardians/:guardianId/account-link', guardians.sendGuardianLink);
+router.delete('/learners/:learnerId/guardians/:guardianId', guardians.removeGuardian);
 
 // ---- Classes --------------------------------------------------------------------
 

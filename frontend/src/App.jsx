@@ -39,6 +39,8 @@ const Worksheets = lazy(() => import('./pages/teacher/Worksheets'));
 const WorksheetCreate = lazy(() => import('./pages/teacher/WorksheetCreate'));
 const WorksheetDetail = lazy(() => import('./pages/teacher/WorksheetDetail'));
 
+const ChildProgress = lazy(() => import('./pages/parent/ChildProgress'));
+
 const page = (Component) => (
   <Suspense fallback={<FullPageLoader label="Loading page…" />}>
     <Component />
@@ -77,6 +79,10 @@ export const AppRoutes = () => (
           <Route path="learners/:learnerId" element={page(LearnerDetail)} />
           <Route path="reports" element={page(Reports)} />
           <Route path="year-end" element={page(YearEnd)} />
+        </Route>
+
+        <Route path="parent" element={<ProtectedRoute allowedRoles={['parent']} />}>
+          <Route path="children/:learnerId" element={page(ChildProgress)} />
         </Route>
 
         <Route path="teacher" element={<ProtectedRoute allowedRoles={['teacher']} />}>

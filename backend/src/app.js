@@ -13,6 +13,7 @@ import superAdminRoutes from './routes/superAdminRoutes.js';
 import schoolAdminRoutes from './routes/schoolAdminRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import curriculumRoutes from './routes/curriculumRoutes.js';
+import parentRoutes from './routes/parentRoutes.js';
 
 const app = express();
 const isTest = process.env.NODE_ENV === 'test';
@@ -84,6 +85,7 @@ app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/school-admin', schoolAdminRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/curriculum', curriculumRoutes);
+app.use('/api/parent', parentRoutes);
 
 // 404 handler
 app.use((req, res) => {

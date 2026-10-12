@@ -221,7 +221,7 @@ const AssessmentDetail = () => {
               </h2>
               <p className="el-panel__subtitle">
                 {editable
-                  ? `Type each learner’s mark out of ${formatMarks(total)}. Press Enter for the next learner; leave blank if not done yet.`
+                  ? `Type each learner’s mark out of ${formatMarks(total)}. Press Enter for the next learner; leave blank if not done yet. Comments are shared with parents.`
                   : 'Marks recorded for this assessment.'}
               </p>
             </div>
