@@ -12,18 +12,12 @@ import {
 } from 'react-icons/lu';
 import { useAuth } from '../../contexts/useAuth';
 import { useApi, useDocumentTitle } from '../../hooks/useApi';
-import { gradeLabel, plural, timeAgo } from '../../lib/format';
+import { gradeLabel, greeting, plural, timeAgo } from '../../lib/format';
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import EmptyState from '../../components/ui/EmptyState';
+import ActivityFeed from '../../components/ui/ActivityFeed';
 import { BarsChart, TrendChart } from '../../components/charts/Charts';
-
-const greeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-};
 
 const monthLabel = (yyyyMm) =>
   new Date(`${yyyyMm}-01T00:00:00`).toLocaleDateString('en-ZA', { month: 'short' });
@@ -186,28 +180,7 @@ const SuperAdminDashboard = () => {
                 Recent activity
               </h2>
             </div>
-            {!loading && data.recentActivity.length === 0 ? (
-              <EmptyState compact icon={LuActivity} title="Nothing yet">
-                Changes made by admins and teachers show up here.
-              </EmptyState>
-            ) : (
-              <ol className="el-feed">
-                {data?.recentActivity.map((item) => (
-                  <li key={item.id} className="el-feed__item">
-                    <span className="el-feed__dot" aria-hidden="true" />
-                    <div className="min-w-0">
-                      <div>
-                        <span className="fw-semibold">{item.actor ?? 'Someone'}</span>{' '}
-                        <span className="text-body-secondary">{item.description.toLowerCase()}</span>
-                      </div>
-                      <div className="el-cell-secondary">
-                        {[item.school_name, timeAgo(item.created_at)].filter(Boolean).join(' · ')}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
+            <ActivityFeed items={data?.recentActivity} showSchool />
           </section>
         </div>
       </div>

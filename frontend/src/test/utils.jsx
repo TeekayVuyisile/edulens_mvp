@@ -14,6 +14,16 @@ export const TEACHER = {
   role: 'teacher',
 };
 
+export const SCHOOL_ADMIN = {
+  user_id: 'u-school-admin',
+  email: 'principal@galeshewe.co.za',
+  first_name: 'Lindiwe',
+  last_name: 'Mokoena',
+  role: 'school_admin',
+  school_id: 'school-a',
+  school_name: 'Galeshewe Primary',
+};
+
 /** A failed response for mockApi routes. */
 export const fail = (status, message, extra = {}) => ({
   __fail: true,

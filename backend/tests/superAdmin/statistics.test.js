@@ -47,7 +47,8 @@ describe('describeActivity', () => {
     ['POST /api/auth/login', 'Signed in'],
     ['PATCH /api/super-admin/schools/5d0c0b1e-1111-4222-8333-444455556666/status', 'Changed a school’s status'],
     ['POST /api/teacher/assessments/abc/bulk-grade', 'Recorded marks'],
-    ['DELETE /api/school-admin/classes/5d0c0b1e-1111-4222-8333-444455556666/learners/5d0c0b1e-1111-4222-8333-444455556666', 'Deleted learners'],
+    ['DELETE /api/school-admin/classes/5d0c0b1e-1111-4222-8333-444455556666/learners/5d0c0b1e-1111-4222-8333-444455556666', 'Took a learner out of a class'],
+    ['DELETE /api/teacher/assessments/5d0c0b1e-1111-4222-8333-444455556666/resources/5d0c0b1e-1111-4222-8333-444455556666', 'Deleted resources'],
     ['PUT /classes', 'Updated classes'],
   ])('%s → %s', (actionType, expected) => {
     expect(describeActivity(actionType)).toBe(expected);

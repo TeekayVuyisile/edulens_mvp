@@ -1,207 +1,163 @@
 import express from 'express';
-import { requireSchoolAdmin } from '../middleware/authMiddleware.js';
-import * as schoolAdminController from '../controllers/schoolAdminController.js';
-import { validate, validateUuidParams } from '../middleware/validationMiddleware.js';
-import { body, param } from 'express-validator';
 import multer from 'multer';
+import { body, query } from 'express-validator';
+import { requireSchoolAdmin } from '../middleware/authMiddleware.js';
+import { validate, validateUuidParams } from '../middleware/validationMiddleware.js';
+import { CLASS_GRADES } from '../models/Class.js';
+import { learnerValidation } from '../services/learnerRules.js';
+import { badRequest } from '../utils/httpError.js';
+import { getDashboard } from '../controllers/schoolAdmin/dashboardController.js';
+import * as teachers from '../controllers/schoolAdmin/teachersController.js';
+import * as learners from '../controllers/schoolAdmin/learnersController.js';
+import * as classes from '../controllers/schoolAdmin/classesController.js';
+import { getPerformance } from '../controllers/schoolAdmin/reportsController.js';
 
 const router = express.Router();
 
 validateUuidParams(router, ['classId', 'learnerId', 'teacherId']);
-const upload = multer({ dest: 'uploads/' });
 
-// Apply school admin middleware to all routes
 router.use(requireSchoolAdmin);
 
-// Dashboard
-router.get('/dashboard', schoolAdminController.getDashboard);
+// ---- Shared rules ---------------------------------------------------------------
 
-// User Management
-router.post('/teachers',
-  validate([
-    body('email').isEmail(),
-    body('first_name').notEmpty(),
-    body('last_name').notEmpty(),
-    body('phone').optional().isMobilePhone()
-  ]),
-  schoolAdminController.createTeacher
-);
+const requiredText = (field, label, max = 255) =>
+  body(field).isString().trim().notEmpty().withMessage(`${label} is required`)
+    .isLength({ max }).withMessage(`${label} must be ${max} characters or fewer`);
 
-router.post('/teachers/bulk-import',
-  upload.single('file'),
-  schoolAdminController.bulkImportTeachers
-);
+const email = (field = 'email', { optional = false } = {}) => {
+  const chain = body(field);
+  return (optional ? chain.optional() : chain)
+    .trim().toLowerCase().isEmail().withMessage('Enter a valid email address');
+};
 
-router.get('/teachers', schoolAdminController.getTeachers);
+const phone = (field) =>
+  body(field).optional({ values: 'falsy' }).trim()
+    .matches(/^\+?[\d\s()-]{7,20}$/).withMessage('Enter a valid phone number');
 
-// Update the create learner validation - FIXED VERSION
-router.post('/learners',
-  validate([
-    body('first_name').notEmpty().trim(),
-    body('last_name').notEmpty().trim(),
-    body('date_of_birth').isISO8601(),
-    body('gender').optional().isIn(['Male', 'Female', 'Other', 'Prefer not to say']),
-    body('current_class_id').optional({ nullable: true, checkFalsy: true }).isUUID(),
-    body('guardian_email').optional({ nullable: true, checkFalsy: true }).isEmail(),
-    body('guardian_phone').optional({ nullable: true, checkFalsy: true }).isMobilePhone(),
-    body('has_special_needs').optional({ nullable: true, checkFalsy: true }).isBoolean(),
-    body('special_needs_notes').optional({ nullable: true, checkFalsy: true }).isString(),
-    body('medical_notes').optional({ nullable: true, checkFalsy: true }).isString()
-  ]),
-  schoolAdminController.createLearner
-);
-// Add this route with other learner routes
-router.get('/learners/:learnerId',
-  schoolAdminController.getLearnerById
-);
+const isActive = body('is_active').isBoolean({ strict: true }).withMessage('is_active must be true or false');
 
-router.post('/learners/bulk-import',
-  upload.single('file'),
-  schoolAdminController.bulkImportLearners
-);
+const pagination = [
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+];
 
-router.get('/learners', schoolAdminController.getLearners);
+const uuidBody = (field, label) => body(field).isUUID().withMessage(`Choose a ${label}`);
 
-// Class Management
-router.post('/classes',
-  validate([
-    body('class_name').notEmpty(),
-    body('grade_level').isIn(['R', '1', '2', '3']),
-    body('academic_year').isInt({ min: 2000, max: 2100 }),
-    body('primary_teacher_id').optional().isUUID()
-  ]),
-  schoolAdminController.createClass
-);
+// Spreadsheets are read from memory (never written to disk) and capped at 2 MB.
+const spreadsheet = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
+const uploadSpreadsheet = (req, res, next) =>
+  spreadsheet.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === 'LIMIT_FILE_SIZE') return next(badRequest('The file is larger than 2 MB. Split it into smaller files.'));
+    if (error instanceof multer.MulterError) return next(badRequest('Upload one CSV or Excel file in the “file” field'));
+    return next(error);
+  });
 
-router.get('/classes', schoolAdminController.getClasses);
-router.get('/classes/:classId', schoolAdminController.getClassDetails);
-router.put('/classes/:classId', schoolAdminController.updateClass);
+// ---- Dashboard ------------------------------------------------------------------
 
-// Academic Progress
-router.post('/learners/:learnerId/progress',
-  validate([
-    body('action').isIn(['promote', 'repeat']),
-    body('next_class_id').optional().isUUID()
-  ]),
-  schoolAdminController.updateLearnerProgress
-);
+router.get('/dashboard', getDashboard);
 
-// Reports
-router.get('/reports/performance',
-  schoolAdminController.getPerformanceReports
-);
+// ---- Teachers -------------------------------------------------------------------
 
-router.get('/reports/worksheets',
-  schoolAdminController.getWorksheetReports
-);
-// Add these routes after existing class routes
+router.get('/teachers', validate([
+  query('status').optional().isIn(['active', 'pending', 'inactive']),
+  ...pagination,
+]), teachers.listTeachers);
 
-// Teacher assignments
-router.post('/classes/:classId/assign-teacher',
-  validate([
-    body('teacher_id').isUUID(),
-    body('is_primary').optional().isBoolean()
-  ]),
-  schoolAdminController.assignTeacherToClass
-);
+router.post('/teachers', validate([
+  requiredText('first_name', 'First name', 100),
+  requiredText('last_name', 'Last name', 100),
+  email(),
+  phone('phone'),
+]), teachers.inviteTeacher);
 
-router.delete('/classes/:classId/teachers/:teacherId',
-  schoolAdminController.removeTeacherFromClass
-);
+router.get('/teachers/:teacherId', teachers.getTeacher);
 
-router.get('/classes/:classId/teachers', schoolAdminController.getClassTeachers);
+router.put('/teachers/:teacherId', validate([
+  requiredText('first_name', 'First name', 100).optional(),
+  requiredText('last_name', 'Last name', 100).optional(),
+  email('email', { optional: true }),
+  phone('phone'),
+]), teachers.updateTeacher);
 
-// Class details
-router.get('/classes/:classId/learners', schoolAdminController.getClassLearners);
-router.get('/classes/:classId/curriculum', schoolAdminController.getClassCurriculum);
-router.get('/classes/:classId/analytics', schoolAdminController.getClassAnalytics);
+router.patch('/teachers/:teacherId/status', validate([isActive]), teachers.setTeacherStatus);
+router.post('/teachers/:teacherId/account-link', teachers.sendAccountLink);
 
-// Teacher list for dropdowns
-router.get('/teachers/list', schoolAdminController.getTeachersList);
+// ---- Learners -------------------------------------------------------------------
 
-// Academic year management
-router.get('/academic-years', schoolAdminController.getAcademicYears);
-router.post('/academic-years/:year/archive',
-  param('year').isInt({ min: 2000, max: 2100 }),
-  schoolAdminController.archiveAcademicYear
-);   
-// Add these routes after existing class routes
+router.get('/learners', validate([
+  query('status').optional().isIn(['current', 'unplaced', 'left', 'all']),
+  query('class_id').optional().isUUID(),
+  query('grade').optional().isIn(CLASS_GRADES),
+  ...pagination,
+]), learners.listLearners);
 
-// Learner assignment routes
-router.post('/classes/:classId/assign-learner',
-  validate([
-    body('learner_id').isUUID()
-  ]),
-  schoolAdminController.assignLearnerToClass
-);
+router.post('/learners', validate([
+  ...learnerValidation(),
+  body('class_id').optional({ values: 'falsy' }).isUUID().withMessage('Choose a class'),
+]), learners.createLearner);
 
-router.delete('/classes/:classId/learners/:learnerId',
-  schoolAdminController.removeLearnerFromClass
-);
+// Registered before /learners/:learnerId so "import" isn't read as an id.
+router.post('/learners/import', uploadSpreadsheet, learners.importLearners);
 
-router.get('/classes/:classId/available-learners',
-  schoolAdminController.getAvailableLearners
-);
+router.get('/learners/:learnerId', learners.getLearner);
+router.put('/learners/:learnerId', validate(learnerValidation({ partial: true })), learners.updateLearner);
+router.delete('/learners/:learnerId', learners.deleteLearner);
 
-// Class status toggle route
-router.patch('/classes/:classId/toggle-status',
-  validate([
-    body('is_active').isBoolean()
-  ]),
-  schoolAdminController.toggleClassStatus
-);               
-// Teacher management routes
-router.get('/teachers/:teacherId',
-  schoolAdminController.getTeacherById
-);
+router.patch('/learners/:learnerId/status', validate([
+  body('academic_status').isIn(['active', 'inactive']).withMessage('Status must be active or inactive'),
+]), learners.setLearnerStatus);
 
-router.put('/teachers/:teacherId',
-  validate([
-    body('email').optional().isEmail(),
-    body('first_name').optional().notEmpty(),
-    body('last_name').optional().notEmpty(),
-    body('phone').optional().isMobilePhone(),
-    body('is_active').optional().isBoolean()
-  ]),
-  schoolAdminController.updateTeacher
-);
+router.patch('/learners/:learnerId/class', validate([
+  body('class_id').optional({ values: 'null' }).isUUID().withMessage('Choose a class'),
+]), learners.setLearnerClass);
 
-router.patch('/teachers/:teacherId/password',
-  validate([
-    body('new_password').isLength({ min: 6 })
-  ]),
-  schoolAdminController.changeTeacherPassword
-);
+// ---- Classes --------------------------------------------------------------------
 
-router.patch('/teachers/:teacherId/toggle-active',
-  validate([
-    body('is_active').isBoolean()
-  ]),
-  schoolAdminController.toggleTeacherActiveStatus
-);
+const classRules = (creating) => {
+  const maybe = (chain) => (creating ? chain : chain.optional());
+  return [
+    maybe(requiredText('class_name', 'Class name', 100)),
+    maybe(body('grade_level')).isIn(CLASS_GRADES).withMessage('Choose Grade R, 1, 2 or 3'),
+    maybe(body('academic_year')).isInt({ min: 2000, max: 2100 }).withMessage('Enter a year such as 2026').toInt(),
+    body('max_capacity').optional().isInt({ min: 1, max: 60 }).withMessage('Capacity must be between 1 and 60').toInt(),
+  ];
+};
 
-router.get('/teachers/:teacherId/classes',
-  schoolAdminController.getTeacherClasses
-);
-// Learner management routes
-router.get('/learners/:learnerId/performance',
-  schoolAdminController.getLearnerPerformance
-);
+router.get('/classes', validate([
+  query('year').optional().isInt({ min: 2000, max: 2100 }),
+  query('grade').optional().isIn(CLASS_GRADES),
+  query('status').optional().isIn(['active', 'inactive', 'all']),
+]), classes.listClasses);
 
-router.put('/learners/:learnerId',
-  validate([
-    body('first_name').notEmpty(),
-    body('last_name').notEmpty(),
-    body('date_of_birth').isISO8601(),
-    body('academic_status').isIn(['active', 'archived', 'graduated', 'repeated', 'inactive'])
-  ]),
-  schoolAdminController.updateLearner
-);
+router.post('/classes', validate([
+  ...classRules(true),
+  body('teacher_id').optional({ values: 'falsy' }).isUUID().withMessage('Choose a teacher'),
+]), classes.createClass);
 
-router.patch('/learners/:learnerId/status',
-  validate([
-    body('academic_status').isIn(['active', 'archived', 'graduated', 'repeated', 'inactive'])
-  ]),
-  schoolAdminController.updateLearnerStatus
-);
+router.get('/classes/:classId', classes.getClass);
+router.put('/classes/:classId', validate(classRules(false)), classes.updateClass);
+router.patch('/classes/:classId/status', validate([isActive]), classes.setClassStatus);
+router.delete('/classes/:classId', classes.deleteClass);
+
+router.post('/classes/:classId/teachers', validate([
+  uuidBody('teacher_id', 'teacher'),
+  body('is_primary').optional().isBoolean({ strict: true }),
+]), classes.assignTeacher);
+router.delete('/classes/:classId/teachers/:teacherId', classes.removeTeacher);
+
+router.post('/classes/:classId/learners', validate([
+  body('learner_ids').isArray({ min: 1, max: 200 }).withMessage('Choose at least one learner'),
+  body('learner_ids.*').isUUID().withMessage('Invalid learner id'),
+]), classes.addLearners);
+router.delete('/classes/:classId/learners/:learnerId', classes.removeLearner);
+
+// ---- Reports --------------------------------------------------------------------
+
+router.get('/reports/performance', validate([
+  query('year').optional().isInt({ min: 2000, max: 2100 }),
+  query('grade').optional().isIn(CLASS_GRADES),
+  query('term').optional().isIn(['1', '2', '3', '4']),
+]), getPerformance);
+
 export default router;

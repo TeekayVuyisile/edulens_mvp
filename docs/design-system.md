@@ -106,6 +106,8 @@ Reusable pieces in `frontend/src/components/ui/` (styles in `ui-kit.css`):
 | `Pagination` | "Showing 21–40 of 57" with previous/next |
 | `ShareLinkDialog` | Invitation / reset link with copy and WhatsApp share |
 | `TableSkeleton` | Placeholder rows while a table loads |
+| `ActivityFeed` | "Who did what, when" timeline for dashboards |
+| `CapacityMeter` | Learners / places in a class: number, thin bar, "Full" or "N places left" (ARIA meter) |
 
 Layout helpers: `.el-panel` (+ `__header`, `__body`), `.el-toolbar`, `.el-table-wrap` + `.el-table`,
 `.el-stat-grid`, `.el-split` (main + side), `.el-stack`, `.el-list`, `.el-details`, `.el-feed`.
@@ -116,6 +118,18 @@ Layout helpers: `.el-panel` (+ `__header`, `__body`), `.el-toolbar`, `.el-table-
 directly labelled). Single series in brand indigo, validated with the dataviz palette checks.
 2px lines, 4px rounded bar ends, a recessive grid, a tooltip that leads with the value, and a
 visually hidden table so the numbers never depend on hover. Never two y-axes.
+
+### Marks and CAPS levels
+
+Averages are shown as a percentage plus the CAPS achievement level (`capsLevel()` in
+`lib/format.js`): L7 80%+ … L1 below 30%. The `.el-level--N` pill always says "Level N", and
+its colour (green 5–7, indigo 4, amber 3, red 1–2) is never the only signal. Reports always
+plot all seven levels in order so the distribution isn't distorted by empty levels.
+
+### Imports
+
+Spreadsheet imports are two-step: check the file (every row, with what to fix in plain words),
+then import only the rows that are ready. Nothing is saved on the check.
 
 ### Account links
 

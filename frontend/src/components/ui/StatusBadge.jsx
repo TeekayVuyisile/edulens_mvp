@@ -5,6 +5,9 @@ const STATUSES = {
   pending: { label: 'Invite pending', tone: 'warning' },
   archived: { label: 'Archived', tone: 'neutral' },
   attention: { label: 'Needs attention', tone: 'warning' },
+  unplaced: { label: 'Not in a class', tone: 'warning' },
+  left: { label: 'Left school', tone: 'neutral' },
+  full: { label: 'Full', tone: 'warning' },
 };
 
 const StatusBadge = ({ status, label }) => {

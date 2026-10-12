@@ -61,12 +61,13 @@ class User {
   // Find user by email
   static async findByEmail(email) {
     const query = `
-      SELECT 
-        user_id, email, password_hash, first_name, last_name, 
-        role, school_id, phone, profile_image_url, is_active,
-        last_login, created_at
-      FROM users
-      WHERE LOWER(email) = LOWER($1)
+      SELECT
+        u.user_id, u.email, u.password_hash, u.first_name, u.last_name,
+        u.role, u.school_id, u.phone, u.profile_image_url, u.is_active,
+        u.last_login, u.created_at, s.school_name
+      FROM users u
+      LEFT JOIN schools s ON s.school_id = u.school_id
+      WHERE LOWER(u.email) = LOWER($1)
     `;
 
     try {
@@ -81,12 +82,13 @@ class User {
   // Find user by ID
   static async findById(userId) {
     const query = `
-      SELECT 
-        user_id, email, first_name, last_name, role, 
-        school_id, phone, profile_image_url, is_active,
-        last_login, created_at
-      FROM users 
-      WHERE user_id = $1
+      SELECT
+        u.user_id, u.email, u.first_name, u.last_name, u.role,
+        u.school_id, u.phone, u.profile_image_url, u.is_active,
+        u.last_login, u.created_at, s.school_name
+      FROM users u
+      LEFT JOIN schools s ON s.school_id = u.school_id
+      WHERE u.user_id = $1
     `;
 
     try {

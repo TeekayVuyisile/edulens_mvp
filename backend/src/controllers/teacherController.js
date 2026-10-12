@@ -1,4 +1,5 @@
 import ClassModel from '../models/Class.js';
+import Learner from '../models/Learner.js';
 import Assessment from '../models/Assessment.js';
 import Worksheet from '../models/Worksheet.js';
 import pool from '../config/database.js';
@@ -114,11 +115,8 @@ export const getClassLearners = async (req, res) => {
     const query = `
       SELECT 
         l.learner_id,
-        l.user_id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        u.profile_image_url,
+        l.first_name,
+        l.last_name,
         l.date_of_birth,
         l.gender,
         l.academic_status,
@@ -145,10 +143,9 @@ export const getClassLearners = async (req, res) => {
             AND a.class_id = $1
         ) as average_score
       FROM learners l
-      JOIN users u ON l.user_id = u.user_id
       WHERE l.current_class_id = $1
         AND l.academic_status = 'active'
-      ORDER BY u.last_name, u.first_name
+      ORDER BY l.last_name, l.first_name
     `;
 
     const result = await pool.query(query, [classId]);
@@ -205,13 +202,12 @@ export const getClassAssessments = async (req, res) => {
             g.grade_letter,
             g.is_graded,
             g.teacher_feedback,
-            u.first_name,
-            u.last_name
+            l.first_name,
+            l.last_name
           FROM grades g
           JOIN learners l ON g.learner_id = l.learner_id
-          JOIN users u ON l.user_id = u.user_id
           WHERE g.assessment_id = $1
-          ORDER BY u.last_name, u.first_name
+          ORDER BY l.last_name, l.first_name
         `;
 
         const gradesResult = await pool.query(gradesQuery, [assessment.assessment_id]);
@@ -281,16 +277,15 @@ export const getClassStatistics = async (req, res) => {
       learner_performance AS (
         SELECT 
           l.learner_id,
-          u.first_name,
-          u.last_name,
+          l.first_name,
+          l.last_name,
           COUNT(g.grade_id) as total_assessments,
           ROUND(AVG(g.percentage)::numeric, 2) as average_score
         FROM learners l
-        JOIN users u ON l.user_id = u.user_id
         LEFT JOIN grades g ON l.learner_id = g.learner_id AND g.is_graded = true
         LEFT JOIN assessments a ON g.assessment_id = a.assessment_id AND a.class_id = $1
         WHERE l.current_class_id = $1
-        GROUP BY l.learner_id, u.first_name, u.last_name
+        GROUP BY l.learner_id, l.first_name, l.last_name
       ),
       subject_performance AS (
         SELECT 
@@ -428,6 +423,8 @@ export const bulkAddLearners = async (req, res) => {
 
       for (const [index, learnerData] of learners.entries()) {
         try {
+          // A failed row must not abort the rows after it.
+          await client.query('SAVEPOINT learner_row');
           // Validate required fields
           if (!learnerData.first_name || !learnerData.last_name) {
             throw new Error('First name and last name are required');
@@ -451,65 +448,24 @@ export const bulkAddLearners = async (req, res) => {
             throw new Error(`Learner must be between 4 and 10 years old (Age: ${age})`);
           }
 
-          // Create a simple username for internal use (no email needed)
-          const username = `${learnerData.first_name.toLowerCase()}.${learnerData.last_name.toLowerCase()}.${Date.now().toString().slice(-6)}`;
-          
-          // Create user account with minimal information
-          const userQuery = `
-            INSERT INTO users (
-              email, password_hash, first_name, last_name, 
-              role, school_id, is_active
-            )
-            VALUES ($1, $2, $3, $4, 'learner', $5, true)
-            RETURNING user_id
-          `;
-
-          // Generate a simple placeholder email (won't be used for login in MVP)
-          const placeholderEmail = `${username}@${schoolId.substring(0, 8)}.edu`;
-          const tempPassword = 'learner123'; // Simple default password
-
-          // Hash password
-          const bcrypt = await import('bcryptjs');
-          const salt = await bcrypt.genSalt(10);
-          const passwordHash = await bcrypt.hash(tempPassword, salt);
-
-          const userResult = await client.query(userQuery, [
-            placeholderEmail,
-            passwordHash,
-            learnerData.first_name,
-            learnerData.last_name,
-            schoolId
-          ]);
-
-          // Create learner profile with all fields
-          const learnerQuery = `
-            INSERT INTO learners (
-              user_id, school_id, current_class_id,
-              date_of_birth, gender, guardian_name,
-              guardian_email, guardian_phone,
-              has_special_needs, special_needs_notes,
-              medical_notes, enrollment_date
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_DATE)
-            RETURNING learner_id
-          `;
-
-          const learnerResult = await client.query(learnerQuery, [
-            userResult.rows[0].user_id,
-            schoolId,
-            classId,
-            learnerData.date_of_birth,
-            learnerData.gender || null,
-            learnerData.guardian_name || null,
-            learnerData.guardian_email || null,
-            learnerData.guardian_phone || null,
-            learnerData.has_special_needs || false,
-            learnerData.special_needs_notes || null,
-            learnerData.medical_notes || null
-          ]);
+          // Learners are plain records; they never sign in.
+          const learner = await Learner.create({
+            school_id: schoolId,
+            current_class_id: classId,
+            first_name: learnerData.first_name.trim(),
+            last_name: learnerData.last_name.trim(),
+            date_of_birth: learnerData.date_of_birth,
+            gender: learnerData.gender || null,
+            guardian_name: learnerData.guardian_name || null,
+            guardian_email: learnerData.guardian_email || null,
+            guardian_phone: learnerData.guardian_phone || null,
+            has_special_needs: learnerData.has_special_needs || false,
+            special_needs_notes: learnerData.special_needs_notes || null,
+            medical_notes: learnerData.medical_notes || null,
+          }, client);
 
           createdLearners.push({
-            learner_id: learnerResult.rows[0].learner_id,
+            learner_id: learner.learner_id,
             name: `${learnerData.first_name} ${learnerData.last_name}`,
             date_of_birth: learnerData.date_of_birth,
             gender: learnerData.gender || 'Not specified'
@@ -518,6 +474,7 @@ export const bulkAddLearners = async (req, res) => {
           results.summary.success++;
 
         } catch (error) {
+          await client.query('ROLLBACK TO SAVEPOINT learner_row');
           results.summary.failed++;
           results.summary.errors.push({
             row: index + 1,
@@ -706,6 +663,8 @@ async function bulkImportLearnersProcess(learners, classId, schoolId, teacherId)
 
     for (const [index, learnerData] of learners.entries()) {
       try {
+        // A failed row must not abort the rows after it.
+        await client.query('SAVEPOINT learner_row');
         // Map different column names
         const mappedData = {
           first_name: learnerData.first_name || learnerData['First Name'] || '',
@@ -746,63 +705,24 @@ async function bulkImportLearnersProcess(learners, classId, schoolId, teacherId)
           throw new Error(`Learner must be between 4 and 10 years old (Age: ${age})`);
         }
 
-        // Create a simple username for internal use
-        const username = `${mappedData.first_name.toLowerCase()}.${mappedData.last_name.toLowerCase()}.${Date.now().toString().slice(-6)}`;
-        
-        // Create user account with placeholder email
-        const userQuery = `
-          INSERT INTO users (
-            email, password_hash, first_name, last_name, 
-            role, school_id, is_active
-          )
-          VALUES ($1, $2, $3, $4, 'learner', $5, true)
-          RETURNING user_id
-        `;
-
-        const placeholderEmail = `${username}@${schoolId.substring(0, 8)}.edu`;
-        const tempPassword = 'learner123';
-
-        const bcrypt = await import('bcryptjs');
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(tempPassword, salt);
-
-        const userResult = await client.query(userQuery, [
-          placeholderEmail,
-          passwordHash,
-          mappedData.first_name,
-          mappedData.last_name,
-          schoolId
-        ]);
-
-        // Create learner profile with all fields
-        const learnerQuery = `
-          INSERT INTO learners (
-            user_id, school_id, current_class_id,
-            date_of_birth, gender, guardian_name,
-            guardian_email, guardian_phone,
-            has_special_needs, special_needs_notes,
-            medical_notes, enrollment_date
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_DATE)
-          RETURNING learner_id
-        `;
-
-        const learnerResult = await client.query(learnerQuery, [
-          userResult.rows[0].user_id,
-          schoolId,
-          classId,
-          mappedData.date_of_birth,
-          mappedData.gender || null,
-          mappedData.guardian_name || null,
-          mappedData.guardian_email || null,
-          mappedData.guardian_phone || null,
-          mappedData.has_special_needs,
-          mappedData.special_needs_notes || null,
-          mappedData.medical_notes || null
-        ]);
+        // Learners are plain records; they never sign in.
+        const learner = await Learner.create({
+          school_id: schoolId,
+          current_class_id: classId,
+          first_name: mappedData.first_name.trim(),
+          last_name: mappedData.last_name.trim(),
+          date_of_birth: mappedData.date_of_birth,
+          gender: mappedData.gender || null,
+          guardian_name: mappedData.guardian_name || null,
+          guardian_email: mappedData.guardian_email || null,
+          guardian_phone: mappedData.guardian_phone || null,
+          has_special_needs: mappedData.has_special_needs,
+          special_needs_notes: mappedData.special_needs_notes || null,
+          medical_notes: mappedData.medical_notes || null,
+        }, client);
 
         results.created_learners.push({
-          learner_id: learnerResult.rows[0].learner_id,
+          learner_id: learner.learner_id,
           name: `${mappedData.first_name} ${mappedData.last_name}`,
           date_of_birth: mappedData.date_of_birth,
           gender: mappedData.gender || 'Not specified'
@@ -811,6 +731,7 @@ async function bulkImportLearnersProcess(learners, classId, schoolId, teacherId)
         results.summary.success++;
 
       } catch (error) {
+        await client.query('ROLLBACK TO SAVEPOINT learner_row');
         results.summary.failed++;
         results.summary.errors.push({
           row: index + 1,
@@ -1052,9 +973,8 @@ export const getLearnerProfile = async (req, res) => {
     const learnerQuery = `
       SELECT 
         l.*,
-        u.first_name,
-        u.last_name,
-        u.email,
+        l.first_name,
+        l.last_name,
         c.class_name,
         c.grade_level,
         json_build_object(
@@ -1063,7 +983,6 @@ export const getLearnerProfile = async (req, res) => {
           'guardian_phone', l.guardian_phone
         ) as guardian_info
       FROM learners l
-      JOIN users u ON l.user_id = u.user_id
       LEFT JOIN classes c ON l.current_class_id = c.class_id
       WHERE l.learner_id = $1
     `;

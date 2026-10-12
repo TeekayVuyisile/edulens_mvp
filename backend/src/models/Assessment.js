@@ -273,18 +273,14 @@ static async getGradebook(assessmentId) {
   const learnersQuery = `
     SELECT 
       l.learner_id,
-      u.user_id,
-      u.first_name,
-      u.last_name,
-      u.email,
-      u.profile_image_url,
+      l.first_name,
+      l.last_name,
       l.guardian_name,
       l.guardian_email
     FROM learners l
-    JOIN users u ON l.user_id = u.user_id
     WHERE l.current_class_id = $1 
       AND l.academic_status = 'active'
-    ORDER BY u.last_name, u.first_name
+    ORDER BY l.last_name, l.first_name
   `;
   
   // Get existing grades for this assessment
@@ -292,13 +288,12 @@ static async getGradebook(assessmentId) {
     SELECT 
       g.*,
       l.learner_id,
-      u.first_name,
-      u.last_name
+      l.first_name,
+      l.last_name
     FROM grades g
     JOIN learners l ON g.learner_id = l.learner_id
-    JOIN users u ON l.user_id = u.user_id
     WHERE g.assessment_id = $1
-    ORDER BY u.last_name, u.first_name
+    ORDER BY l.last_name, l.first_name
   `;
   
   try {

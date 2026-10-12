@@ -99,18 +99,18 @@ describe('teacher: learner profiles', () => {
   });
 });
 
-describe('school admin: promotion', () => {
+describe('school admin: placing learners', () => {
   beforeEach(resetDb);
 
-  it("cannot promote another school's learner", async () => {
+  it("cannot move another school's learner", async () => {
     const { learner } = await createClassroom();
     const admin = await createUser({ role: 'school_admin' });
     const ownClass = await createClass({ school_id: admin.school_id, grade_level: '2' });
 
     const res = await request(app)
-      .post(`/api/school-admin/learners/${learner.learner_id}/progress`)
+      .patch(`/api/school-admin/learners/${learner.learner_id}/class`)
       .set(authHeader(admin))
-      .send({ action: 'promote', next_class_id: ownClass.class_id });
+      .send({ class_id: ownClass.class_id });
 
     expect(res.status).toBe(404);
     const { rows } = await pool.query('SELECT current_class_id FROM learners WHERE learner_id = $1', [
@@ -125,9 +125,22 @@ describe('school admin: promotion', () => {
     const foreignClass = await createClass();
 
     const res = await request(app)
-      .post(`/api/school-admin/learners/${learner.learner_id}/progress`)
+      .patch(`/api/school-admin/learners/${learner.learner_id}/class`)
       .set(authHeader(admin))
-      .send({ action: 'promote', next_class_id: foreignClass.class_id });
+      .send({ class_id: foreignClass.class_id });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("cannot place another school's learners into its own class", async () => {
+    const { learner } = await createClassroom();
+    const admin = await createUser({ role: 'school_admin' });
+    const ownClass = await createClass({ school_id: admin.school_id });
+
+    const res = await request(app)
+      .post(`/api/school-admin/classes/${ownClass.class_id}/learners`)
+      .set(authHeader(admin))
+      .send({ learner_ids: [learner.learner_id] });
 
     expect(res.status).toBe(404);
   });

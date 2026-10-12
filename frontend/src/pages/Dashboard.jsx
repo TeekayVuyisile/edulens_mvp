@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Button, Spinner, Table, Badge, ProgressBar } from 'react-bootstrap';
+import { Row, Col, Card, Button } from 'react-bootstrap';
 import { useAuth } from '../contexts/useAuth';
 import SuperAdminDashboard from './dashboards/SuperAdminDashboard';
+import SchoolAdminDashboard from './dashboards/SchoolAdminDashboard';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 
 const Dashboard = () => {
   const { user } = useAuth();
 
   // Redesigned dashboards render their own header.
   if (user?.role === 'super_admin') return <SuperAdminDashboard />;
+  if (user?.role === 'school_admin') return <SchoolAdminDashboard />;
 
   return (
     <div>
@@ -19,180 +19,9 @@ const Dashboard = () => {
           Welcome back, <span className="fw-semibold">{user.first_name} {user.last_name}</span>
         </p>
       </div>
-      {user.role === 'school_admin' && <SchoolAdminDashboard />}
       {user.role === 'teacher' && <TeacherDashboard />}
-      {!['school_admin', 'teacher'].includes(user.role) && <DefaultDashboard />}
+      {user.role !== 'teacher' && <DefaultDashboard />}
     </div>
-  );
-};
-
-const formatActivityType = (type) => {
-  return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-};
-
-const formatRelativeTime = (dateString) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffInMinutes = Math.floor((now - date) / 60000);
-  
-  if (diffInMinutes < 1) return 'Just now';
-  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-  if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-  return date.toLocaleDateString();
-};
-
-const SchoolAdminDashboard = () => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get('/api/school-admin/dashboard');
-      if (response.data.status === 'success') {
-        setData(response.data.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch school admin dashboard:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading && !data) {
-    return (
-      <div className="text-center py-5">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-2 text-muted">Loading school data...</p>
-      </div>
-    );
-  }
-
-  const stats = [
-    { title: 'Total Teachers', value: data?.summary?.totalTeachers || 0, icon: 'person-badge', color: 'primary', link: '/school-admin/teachers' },
-    { title: 'Total Learners', value: data?.summary?.totalLearners || 0, icon: 'people', color: 'success', link: '/school-admin/learners' },
-    { title: 'Active Classes', value: data?.summary?.activeClasses || 0, icon: 'collection', color: 'info', link: '/school-admin/classes' },
-    { title: 'Avg. Performance', value: `${data?.summary?.averagePerformance || 0}%`, icon: 'graph-up', color: 'warning', link: '/school-admin/reports' },
-  ];
-
-  return (
-    <>
-      <Row className="g-3 mb-4">
-        {stats.map((stat, index) => (
-          <Col key={index} xs={12} sm={6} lg={3}>
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <h6 className="text-muted mb-2 small text-uppercase fw-bold">{stat.title}</h6>
-                    <h2 className="fw-bold mb-0">{stat.value}</h2>
-                  </div>
-                  <div className={`bg-${stat.color}-subtle p-3 rounded`}>
-                    <i className={`bi bi-${stat.icon} fs-4 text-${stat.color}`}></i>
-                  </div>
-                </div>
-                {stat.link && (
-                  <Button as={Link} to={stat.link} variant="link" className="p-0 mt-3 text-decoration-none small">
-                    Manage <i className="bi bi-arrow-right ms-1"></i>
-                  </Button>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Row className="g-4">
-        {/* Recent Activity */}
-        <Col lg={7}>
-          <Card className="border-0 shadow-sm h-100">
-            <Card.Header className="bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Recent School Activity</h5>
-              <Button variant="link" size="sm" onClick={fetchData} className="text-decoration-none">
-                <i className="bi bi-arrow-clockwise me-1"></i> Refresh
-              </Button>
-            </Card.Header>
-            <Card.Body className="p-0">
-              <div className="table-responsive">
-                <Table hover className="align-middle mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th className="ps-4">Activity</th>
-                      <th>User</th>
-                      <th>Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data?.recentActivity?.length > 0 ? (
-                      data.recentActivity.map((activity, index) => (
-                        <tr key={index}>
-                          <td className="ps-4">
-                            <div className="fw-semibold small">{formatActivityType(activity.action_type)}</div>
-                            <div className="text-muted extra-small">{activity.action_type}</div>
-                          </td>
-                          <td>
-                            <div className="small">{activity.first_name} {activity.last_name}</div>
-                            <Badge bg="light" text="dark" className="extra-small border">
-                              {activity.role === 'teacher' ? 'Teacher' : 'Staff'}
-                            </Badge>
-                          </td>
-                          <td className="small text-muted">{formatRelativeTime(activity.created_at)}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="3" className="text-center py-5 text-muted">No recent activity</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </Table>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        
-        {/* Recently Created Classes */}
-        <Col lg={5}>
-          <Card className="border-0 shadow-sm h-100">
-            <Card.Header className="bg-white border-0 py-3">
-              <h5 className="mb-0">Recently Added Classes</h5>
-            </Card.Header>
-            <Card.Body className="p-0">
-              <div className="list-group list-group-flush">
-                {data?.recentClasses?.length > 0 ? (
-                  data.recentClasses.map((cls, index) => (
-                    <div key={index} className="list-group-item border-0 px-4 py-3">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <h6 className="mb-1">{cls.class_name}</h6>
-                          <div className="text-muted small">
-                            Grade {cls.grade_level} • {cls.student_count} Students
-                          </div>
-                        </div>
-                        <div className="text-end text-muted small">
-                          {cls.teacher_name || 'Unassigned'}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-5 text-muted">No classes created recently</div>
-                )}
-              </div>
-              <div className="p-3 border-top text-center">
-                <Button as={Link} to="/school-admin/classes" variant="link" className="text-decoration-none small">
-                  View All Classes <i className="bi bi-arrow-right ms-1"></i>
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </>
   );
 };
 

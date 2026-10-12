@@ -25,6 +25,8 @@ const Users = lazy(() => import('./pages/super-admin/Users'));
 const SchoolClasses = lazy(() => import('./pages/school-admin/Classes'));
 const Teachers = lazy(() => import('./pages/school-admin/Teachers'));
 const Learners = lazy(() => import('./pages/school-admin/Learners'));
+const LearnerDetail = lazy(() => import('./pages/school-admin/LearnerDetail'));
+const SchoolClassDetail = lazy(() => import('./pages/school-admin/ClassDetail'));
 const Reports = lazy(() => import('./pages/school-admin/Reports'));
 
 const TeacherClasses = lazy(() => import('./pages/teacher/Classes'));
@@ -67,8 +69,10 @@ export const AppRoutes = () => (
 
         <Route path="school-admin" element={<ProtectedRoute allowedRoles={['school_admin']} />}>
           <Route path="classes" element={page(SchoolClasses)} />
+          <Route path="classes/:classId" element={page(SchoolClassDetail)} />
           <Route path="teachers" element={page(Teachers)} />
           <Route path="learners" element={page(Learners)} />
+          <Route path="learners/:learnerId" element={page(LearnerDetail)} />
           <Route path="reports" element={page(Reports)} />
         </Route>
 

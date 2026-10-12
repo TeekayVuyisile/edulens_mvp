@@ -1,5 +1,5 @@
 import pool from '../../config/database.js';
-import { describeActivity } from '../../services/activityDescriptions.js';
+import { recentActivity } from '../../services/activityFeed.js';
 import { ok } from '../../utils/respond.js';
 
 // GET /api/super-admin/statistics — everything the platform dashboard needs.
@@ -42,21 +42,7 @@ export const getPlatformStatistics = async (req, res) => {
       GROUP BY c.grade_level
       ORDER BY CASE c.grade_level WHEN 'R' THEN 0 WHEN '1' THEN 1 WHEN '2' THEN 2 WHEN '3' THEN 3 ELSE 4 END
     `),
-    pool.query(`
-      SELECT al.log_id, al.action_type, al.created_at,
-             u.first_name, u.last_name, u.role, s.school_name
-      FROM activity_logs al
-      LEFT JOIN users u ON u.user_id = al.user_id
-      LEFT JOIN schools s ON s.school_id = COALESCE(al.school_id, u.school_id)
-      -- Changes recorded by the request logger ("METHOD /api/..."). Rows from the old
-      -- logger (router-relative paths) and ad-hoc event names can't be described well.
-      WHERE al.action_type SIMILAR TO '(POST|PUT|PATCH|DELETE) /api/%'
-        AND al.action_type NOT LIKE '% /api/auth/%'
-        AND al.user_id IS NOT NULL
-        AND COALESCE((al.action_details ->> 'statusCode')::int, 200) < 400
-      ORDER BY al.created_at DESC
-      LIMIT 12
-    `),
+    recentActivity(),
     pool.query(`
       SELECT s.school_id, s.school_name, s.school_code, s.created_at
       FROM schools s
@@ -72,14 +58,7 @@ export const getPlatformStatistics = async (req, res) => {
     summary: summary.rows[0],
     growth: growth.rows,
     learnersByGrade: learnersByGrade.rows,
-    recentActivity: activity.rows.map((row) => ({
-      id: row.log_id,
-      description: describeActivity(row.action_type),
-      actor: row.first_name ? `${row.first_name} ${row.last_name}` : null,
-      role: row.role,
-      school_name: row.school_name,
-      created_at: row.created_at,
-    })),
+    recentActivity: activity,
     attention: { schoolsWithoutAdmin: schoolsWithoutAdmin.rows },
   });
 };

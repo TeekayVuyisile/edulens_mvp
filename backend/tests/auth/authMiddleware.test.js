@@ -87,20 +87,23 @@ describe('protect() middleware', () => {
     expect(res.body.message).toMatch(/suspended/i);
   });
 
-  it('signs a user out when an admin changes their password', async () => {
+  it('signs a user out everywhere once their password is reset', async () => {
     const admin = await createUser({ role: 'school_admin' });
     const teacher = await createUser({ role: 'teacher', school_id: admin.school_id });
+    await pool.query('UPDATE users SET last_login = NOW() WHERE user_id = $1', [teacher.user_id]);
     const teacherHeaders = authHeader(teacher);
     // Make the existing token older than the change below.
     await new Promise((r) => setTimeout(r, 1100));
 
-    const change = await request(app)
-      .patch(`/api/school-admin/teachers/${teacher.user_id}/password`)
-      .set(authHeader(admin))
-      .send({ new_password: 'ChangedPass1' });
+    const link = await request(app)
+      .post(`/api/school-admin/teachers/${teacher.user_id}/account-link`)
+      .set(authHeader(admin));
+    const token = new URL(link.body.data.link).searchParams.get('token');
+    const reset = await request(app).post('/api/auth/reset-password').send({ token, password: 'ChangedPass1' });
     const res = await request(app).get('/api/auth/profile').set(teacherHeaders);
 
-    expect(change.status).toBe(200);
+    expect(link.body.data.kind).toBe('reset');
+    expect(reset.status).toBe(200);
     expect(res.status).toBe(401);
   });
 });
