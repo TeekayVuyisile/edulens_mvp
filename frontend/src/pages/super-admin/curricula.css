@@ -1,0 +1,121 @@
+/* Curricula master–detail layout */
+.el-curricula {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 992px) {
+  .el-curricula {
+    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+  }
+
+  .el-curricula__list {
+    position: sticky;
+    top: calc(var(--el-topbar-height) + 1.5rem);
+  }
+}
+
+.el-curricula__items > li {
+  padding: 0.375rem;
+  border-bottom: 0;
+}
+
+.el-curricula__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid transparent;
+  border-radius: var(--el-radius);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.el-curricula__item:hover {
+  background: var(--el-surface-muted);
+}
+
+.el-curricula__item.is-selected {
+  background: var(--el-primary-soft);
+  border-color: var(--el-primary-soft-strong);
+}
+
+.el-grade-group + .el-grade-group {
+  border-top: 1px solid var(--el-border);
+}
+
+.el-grade-group__title {
+  margin: 0;
+  padding: 0.875rem 1.25rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--el-text-subtle);
+}
+
+.el-subject {
+  display: block !important;
+  padding: 0 !important;
+}
+
+.el-subject__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1.25rem 0.5rem 0.75rem;
+}
+
+.el-subject__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  border-radius: var(--el-radius);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.el-subject__toggle:hover {
+  background: var(--el-surface-muted);
+}
+
+.el-subject__chevron {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  color: var(--el-text-muted);
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.el-subject__chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.el-topics {
+  list-style: none;
+  margin: 0 1.25rem 0.75rem 2.75rem;
+  padding: 0.25rem 0 0 1rem;
+  border-left: 2px solid var(--el-border);
+}
+
+.el-topics > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.375rem 0;
+}
+
+.min-w-0 {
+  min-width: 0;
+}

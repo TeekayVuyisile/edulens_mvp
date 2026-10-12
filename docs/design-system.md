@@ -89,6 +89,40 @@ app, so people who ask their OS for reduced motion get instant transitions.
 - **Empty states** explain what goes here and offer the next action.
 - **Interactive cards** opt in with `.card-interactive`; plain cards don't react to hover.
 
+## UI kit
+
+Reusable pieces in `frontend/src/components/ui/` (styles in `ui-kit.css`):
+
+| Component | Use |
+|---|---|
+| `PageHeader` | Title, description, optional back link and actions for every page |
+| `StatCard` | One headline number with a tinted icon (`primary`, `success`, `warning`, `neutral`) |
+| `FilterTabs` | Segmented status filter with counts; the selected pill slides (shared layout) |
+| `SearchInput` | Search box with clear button; debounce with `useDebouncedValue` |
+| `StatusBadge` | Word + dot: Active, Inactive, Invite pending, Archived, Needs attention |
+| `EmptyState` | What goes here and the next step (`compact` inside panels) |
+| `ConfirmDialog` | Asks before consequential actions; shows the server's reason if it fails |
+| `RowActions` | ⋮ menu per table row; destructive items last, in red |
+| `Pagination` | "Showing 21–40 of 57" with previous/next |
+| `ShareLinkDialog` | Invitation / reset link with copy and WhatsApp share |
+| `TableSkeleton` | Placeholder rows while a table loads |
+
+Layout helpers: `.el-panel` (+ `__header`, `__body`), `.el-toolbar`, `.el-table-wrap` + `.el-table`,
+`.el-stat-grid`, `.el-split` (main + side), `.el-stack`, `.el-list`, `.el-details`, `.el-feed`.
+
+### Charts
+
+`components/charts/Charts.jsx`: `TrendChart` (change over time) and `BarsChart` (a few categories,
+directly labelled). Single series in brand indigo, validated with the dataviz palette checks.
+2px lines, 4px rounded bar ends, a recessive grid, a tooltip that leads with the value, and a
+visually hidden table so the numbers never depend on hover. Never two y-axes.
+
+### Account links
+
+Admins never set or see other people's passwords. Inviting someone (or sending a reset)
+produces a single-use link that is emailed when email is configured and always shown in
+`ShareLinkDialog`, because many schools coordinate over WhatsApp.
+
 ## Pre-delivery checklist
 
 - [ ] Text contrast ≥ 4.5:1 (muted text no lighter than slate 600)

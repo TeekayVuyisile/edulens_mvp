@@ -160,6 +160,90 @@ class User {
     }
   }
 
+  /**
+   * Creates a staff account that is activated through an invitation link.
+   * The stored password is random and never shown to anyone.
+   */
+  static async createInvited({ email, first_name, last_name, phone, role, school_id }, client = pool) {
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+    const { rows } = await client.query(
+      `INSERT INTO users (email, password_hash, first_name, last_name, phone, role, school_id, is_active)
+       VALUES (LOWER($1), $2, $3, $4, $5, $6, $7, true)
+       RETURNING user_id, email, first_name, last_name, phone, role, school_id, is_active, last_login, created_at`,
+      [email.trim(), passwordHash, first_name, last_name, phone || null, role, school_id ?? null]
+    );
+    return rows[0];
+  }
+
+  /**
+   * Staff directory for the super admin. Learner rows (legacy) and super admins
+   * are not listed. status: 'active' | 'inactive' | 'pending' (never signed in).
+   */
+  static async listStaff({ search, role, status, schoolId, page = 1, limit = 20 } = {}) {
+    const conditions = ["u.role IN ('school_admin', 'teacher')"];
+    const values = [];
+    const add = (sql, value) => {
+      values.push(value);
+      conditions.push(sql.replaceAll('?', `$${values.length}`));
+    };
+
+    if (search) add('(u.first_name ILIKE ? OR u.last_name ILIKE ? OR u.email ILIKE ?)', `%${search}%`);
+    if (role) add('u.role = ?', role);
+    if (schoolId) add('u.school_id = ?', schoolId);
+    const baseWhere = `WHERE ${conditions.join(' AND ')}`;
+    const baseValues = [...values];
+
+    if (status === 'active') conditions.push('u.is_active AND u.last_login IS NOT NULL');
+    if (status === 'inactive') conditions.push('NOT u.is_active');
+    if (status === 'pending') conditions.push('u.is_active AND u.last_login IS NULL');
+    const where = `WHERE ${conditions.join(' AND ')}`;
+    const offset = (page - 1) * limit;
+
+    const [listResult, countResult, totalsResult] = await Promise.all([
+      pool.query(
+        `SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone, u.role, u.school_id,
+                u.is_active, u.last_login, u.created_at, s.school_name, s.school_code
+         FROM users u
+         LEFT JOIN schools s ON s.school_id = u.school_id
+         ${where}
+         ORDER BY u.created_at DESC
+         LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+        [...values, limit, offset]
+      ),
+      pool.query(`SELECT COUNT(*)::int AS total FROM users u ${where}`, values),
+      pool.query(
+        `SELECT
+           COUNT(*)::int AS all,
+           COUNT(*) FILTER (WHERE u.is_active AND u.last_login IS NOT NULL)::int AS active,
+           COUNT(*) FILTER (WHERE u.is_active AND u.last_login IS NULL)::int AS pending,
+           COUNT(*) FILTER (WHERE NOT u.is_active)::int AS inactive
+         FROM users u ${baseWhere}`,
+        baseValues
+      ),
+    ]);
+
+    const total = countResult.rows[0].total;
+    return {
+      users: listResult.rows,
+      counts: totalsResult.rows[0],
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    };
+  }
+
+  /** One staff member with their school, for the admin detail view. */
+  static async findStaffById(userId) {
+    const { rows } = await pool.query(
+      `SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone, u.role, u.school_id,
+              u.is_active, u.last_login, u.created_at, u.updated_at,
+              s.school_name, s.school_code, s.is_active AS school_is_active
+       FROM users u
+       LEFT JOIN schools s ON s.school_id = u.school_id
+       WHERE u.user_id = $1`,
+      [userId]
+    );
+    return rows[0];
+  }
+
   // Only a SHA-256 hash of the reset token is stored, so a database leak
   // doesn't expose usable reset links.
   static hashResetToken(token) {

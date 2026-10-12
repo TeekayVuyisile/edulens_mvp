@@ -18,6 +18,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Profile = lazy(() => import('./pages/Profile'));
 
 const Schools = lazy(() => import('./pages/super-admin/Schools'));
+const SchoolDetail = lazy(() => import('./pages/super-admin/SchoolDetail'));
 const Curricula = lazy(() => import('./pages/super-admin/Curricula'));
 const Users = lazy(() => import('./pages/super-admin/Users'));
 
@@ -59,6 +60,7 @@ export const AppRoutes = () => (
 
         <Route path="super-admin" element={<ProtectedRoute allowedRoles={['super_admin']} />}>
           <Route path="schools" element={page(Schools)} />
+          <Route path="schools/:schoolId" element={page(SchoolDetail)} />
           <Route path="curricula" element={page(Curricula)} />
           <Route path="users" element={page(Users)} />
         </Route>

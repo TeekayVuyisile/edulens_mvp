@@ -19,6 +19,9 @@ Object.assign(process.env, {
   DB_SSL: process.env.TEST_DB_SSL || 'false',
   JWT_SECRET: process.env.JWT_SECRET || 'test-jwt-secret',
   JWT_EXPIRE: '1h',
+  // Never send real email from tests, even if .env has SMTP settings.
+  SMTP_HOST: '',
+  FRONTEND_URL: 'http://localhost:5173',
 });
 
 export default defineConfig({

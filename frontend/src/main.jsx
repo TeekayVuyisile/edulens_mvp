@@ -5,6 +5,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/theme.scss';
 import './styles/global.css';
 import './styles/components.css';
+import './styles/ui-kit.css';
 import App from './App.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(

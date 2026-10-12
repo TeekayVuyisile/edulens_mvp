@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { restoreApi } from './utils';
 
 // jsdom lacks matchMedia, which framer-motion uses for reduced-motion checks.
@@ -23,3 +23,6 @@ afterEach(() => {
   localStorage.clear();
   vi.restoreAllMocks();
 });
+
+// Pages are lazy-loaded; the first import of a page can take over a second in jsdom.
+configure({ asyncUtilTimeout: 5000 });

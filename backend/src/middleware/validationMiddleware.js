@@ -10,7 +10,8 @@ export const validate = (validations) => {
     }
 
     // Format errors for better response
-    const formattedErrors = errors.array().map(error => ({
+    // One message per field: the first rule that failed.
+    const formattedErrors = errors.array({ onlyFirstError: true }).map(error => ({
       type: error.type,
       value: error.value,
       msg: error.msg,

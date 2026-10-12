@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 
 // Import middleware
 import { activityLogger } from './middleware/activityLogger.js';
+import { HttpError, fromDatabaseError } from './utils/httpError.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -102,23 +103,35 @@ app.use((req, res) => {
   });
 });
 
-// Error handling middleware
+// Error handling middleware. Express 5 forwards errors thrown (or rejected)
+// in async handlers here, so handlers can simply `throw notFound(...)`.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error('Error:', {
+  // Malformed JSON bodies and oversized payloads come from body-parser.
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ status: 'error', message: 'Request body is not valid JSON' });
+  }
+
+  const known = err instanceof HttpError ? err : fromDatabaseError(err);
+  if (known) {
+    return res.status(known.statusCode).json({
+      status: 'error',
+      message: known.message,
+      ...known.details
+    });
+  }
+
+  console.error('Unhandled error:', {
     message: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method
   });
 
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal server error';
-
-  res.status(statusCode).json({
+  res.status(err.statusCode || err.status || 500).json({
     status: 'error',
-    message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: 'Something went wrong. Please try again.',
+    ...(process.env.NODE_ENV === 'development' && { detail: err.message, stack: err.stack })
   });
 });
 

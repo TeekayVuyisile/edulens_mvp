@@ -15,15 +15,28 @@ export const TEACHER = {
 };
 
 /** A failed response for mockApi routes. */
-export const fail = (status, message) => ({ __fail: true, status, data: { status: 'error', message } });
+export const fail = (status, message, extra = {}) => ({
+  __fail: true,
+  status,
+  data: { status: 'error', message, ...extra },
+});
+
+export const SUPER_ADMIN = {
+  user_id: 'u-super',
+  email: 'admin@edulens.co.za',
+  first_name: 'Zanele',
+  last_name: 'Khumalo',
+  role: 'super_admin',
+};
 
 const originalAdapter = http.defaults.adapter;
 
 /**
  * Replaces the network with a route table such as
  *   { 'GET /api/auth/profile': {...body}, 'POST /api/auth/login': fail(401, 'Invalid credentials') }
+ * A value may also be a function ({ params, body }) => response.
  * Requests still run through the real axios interceptors (token header, 401 handling).
- * Returns the list of requests made, as { method, url, body, headers }.
+ * Returns the list of requests made, as { method, url, params, body, headers }.
  */
 export const mockApi = (routes = {}) => {
   const requests = [];
@@ -31,13 +44,15 @@ export const mockApi = (routes = {}) => {
   http.defaults.adapter = async (config) => {
     const method = config.method.toUpperCase();
     const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
-    requests.push({ method, url: config.url, body, headers: config.headers });
+    requests.push({ method, url: config.url, params: config.params, body, headers: config.headers });
 
     const key = Object.keys(routes).find((route) => {
       const [m, path] = route.split(' ');
       return m === method && config.url.split('?')[0] === path;
     });
-    const result = key ? routes[key] : fail(404, `No mock for ${method} ${config.url}`);
+    const route = key ? routes[key] : fail(404, `No mock for ${method} ${config.url}`);
+    // A route may be a function of the request, e.g. to answer by query params.
+    const result = typeof route === 'function' ? route({ params: config.params ?? {}, body }) : route;
     const response = {
       data: result?.__fail ? result.data : result,
       status: result?.__fail ? result.status : 200,

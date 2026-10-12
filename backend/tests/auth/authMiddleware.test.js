@@ -88,16 +88,16 @@ describe('protect() middleware', () => {
   });
 
   it('signs a user out when an admin changes their password', async () => {
-    const admin = await createUser({ role: 'super_admin' });
-    const teacher = await createUser({ role: 'teacher' });
+    const admin = await createUser({ role: 'school_admin' });
+    const teacher = await createUser({ role: 'teacher', school_id: admin.school_id });
     const teacherHeaders = authHeader(teacher);
     // Make the existing token older than the change below.
     await new Promise((r) => setTimeout(r, 1100));
 
     const change = await request(app)
-      .patch(`/api/super-admin/users/${teacher.user_id}/change-password`)
+      .patch(`/api/school-admin/teachers/${teacher.user_id}/password`)
       .set(authHeader(admin))
-      .send({ new_password: 'ChangedPass1', confirm_new_password: 'ChangedPass1' });
+      .send({ new_password: 'ChangedPass1' });
     const res = await request(app).get('/api/auth/profile').set(teacherHeaders);
 
     expect(change.status).toBe(200);
