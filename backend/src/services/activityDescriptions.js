@@ -42,7 +42,14 @@ const PATTERNS = [
   ['DELETE', `/api/school-admin/classes/${ID}/learners/${ID}`, 'Took a learner out of a class'],
 
   ['POST', '/api/teacher/assessments', 'Created an assessment'],
-  ['POST', `/api/teacher/assessments/${ID}/bulk-grade`, 'Recorded marks'],
+  ['PUT', `/api/teacher/assessments/${ID}`, 'Updated an assessment'],
+  ['DELETE', `/api/teacher/assessments/${ID}`, 'Deleted an assessment'],
+  ['PUT', `/api/teacher/assessments/${ID}/marks`, 'Recorded marks'],
+  ['POST', `/api/teacher/assessments/${ID}/resources`, 'Added a resource to an assessment'],
+  ['DELETE', `/api/teacher/assessments/${ID}/resources/${ID}`, 'Removed an assessment resource'],
+  ['POST', `/api/teacher/classes/${ID}/learners`, 'Added a learner to their class'],
+  ['POST', `/api/teacher/classes/${ID}/learners/import`, 'Imported learners into their class'],
+  ['PUT', `/api/teacher/learners/${ID}`, 'Updated a learner'],
   ['POST', '/api/teacher/worksheets/generate', 'Generated a worksheet'],
 ].map(([method, path, label]) => ({ method, regex: new RegExp(`^${path}$`), label }));
 

@@ -104,6 +104,17 @@ class Learner {
     };
   }
 
+  /** True when the school already has a learner with this name and birthday (ignoring `exceptId`). */
+  static async isOnRegister({ first_name, last_name, date_of_birth }, schoolId, exceptId = null) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM learners
+       WHERE school_id = $1 AND LOWER(first_name) = LOWER($2) AND LOWER(last_name) = LOWER($3)
+         AND date_of_birth = $4 AND learner_id IS DISTINCT FROM $5`,
+      [schoolId, first_name.trim(), last_name.trim(), date_of_birth, exceptId]
+    );
+    return rows.length > 0;
+  }
+
   /** Full record, or undefined when the learner is not in this school. */
   static async findInSchool(learnerId, schoolId) {
     const { rows } = await pool.query(
@@ -145,6 +156,24 @@ class Learner {
        WHERE g.learner_id = $1 AND g.is_graded = true
        GROUP BY 1
        ORDER BY 1`,
+      [learnerId]
+    );
+    return rows;
+  }
+
+  /** Every mark the learner has, newest first, with the assessment it belongs to. */
+  static async marks(learnerId) {
+    const { rows } = await pool.query(
+      `SELECT a.assessment_id, a.assessment_name, a.assessment_type, a.term_number, a.scheduled_date,
+              a.total_marks::float AS total_marks, s.subject_name, c.class_name, c.academic_year,
+              g.marks_obtained::float AS marks_obtained, g.percentage::float AS percentage,
+              g.teacher_feedback, g.graded_at
+       FROM grades g
+       JOIN assessments a ON a.assessment_id = g.assessment_id
+       JOIN classes c ON c.class_id = a.class_id
+       LEFT JOIN subjects s ON s.subject_id = a.subject_id
+       WHERE g.learner_id = $1 AND g.is_graded
+       ORDER BY COALESCE(a.scheduled_date, g.graded_at::date) DESC, g.graded_at DESC`,
       [learnerId]
     );
     return rows;

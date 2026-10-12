@@ -16,7 +16,6 @@ import {
 import { useApi, useDebouncedValue, useDocumentTitle } from '../../hooks/useApi';
 import { useMutation } from '../../hooks/useMutation';
 import { ageFrom, CLASS_GRADES, fullName, gradeLabel, isCurrentLearner, learnerStatus } from '../../lib/format';
-import './school-admin.css';
 import PageHeader from '../../components/ui/PageHeader';
 import FilterTabs from '../../components/ui/FilterTabs';
 import SearchInput from '../../components/ui/SearchInput';
@@ -25,9 +24,9 @@ import EmptyState from '../../components/ui/EmptyState';
 import Pagination from '../../components/ui/Pagination';
 import RowActions from '../../components/ui/RowActions';
 import TableSkeleton from '../../components/ui/TableSkeleton';
-import LearnerFormModal from './components/LearnerFormModal';
+import LearnerFormModal from '../../components/learners/LearnerFormModal';
 import MoveLearnerModal from './components/MoveLearnerModal';
-import ImportLearnersModal from './components/ImportLearnersModal';
+import ImportLearnersModal from '../../components/learners/ImportLearnersModal';
 import LearnerStatusDialogs from './components/LearnerStatusDialogs';
 
 const PAGE_SIZE = 25;

@@ -1,8 +1,8 @@
 import { useId, useState } from 'react';
 import { Button, Col, Form, Modal, Row, Spinner } from 'react-bootstrap';
-import { useMutation } from '../../../hooks/useMutation';
-import { GENDERS, gradeLabel } from '../../../lib/format';
-import FormAlert from '../../../components/ui/FormAlert';
+import { useMutation } from '../../hooks/useMutation';
+import { GENDERS, gradeLabel } from '../../lib/format';
+import FormAlert from '../ui/FormAlert';
 
 // Foundation Phase learners are 3–12 (the API checks the same range).
 const isoDaysAgo = (years) => {
@@ -28,9 +28,20 @@ const blank = {
 
 /**
  * Adds a learner (no `learner`) or edits one. When adding, `classes` lists the
- * classes they can be placed in; moving an existing learner has its own dialog.
+ * classes they can be placed in (omit it when `createUrl` already fixes the class);
+ * moving an existing learner has its own dialog.
+ * apiBase: '/api/school-admin' or '/api/teacher' (whose learners/:id the edit goes to).
  */
-const LearnerFormModal = ({ learner, classes = [], defaultClassId = '', onClose, onSaved }) => {
+const LearnerFormModal = ({
+  learner,
+  classes = [],
+  defaultClassId = '',
+  apiBase = '/api/school-admin',
+  createUrl = `${apiBase}/learners`,
+  title,
+  onClose,
+  onSaved,
+}) => {
   const titleId = useId();
   const editing = Boolean(learner);
   const [form, setForm] = useState(() =>
@@ -52,8 +63,8 @@ const LearnerFormModal = ({ learner, classes = [], defaultClassId = '', onClose,
     e.preventDefault();
     const { class_id: classId, ...details } = form;
     const result = editing
-      ? await save.run('put', `/api/school-admin/learners/${learner.learner_id}`, details)
-      : await save.run('post', '/api/school-admin/learners', { ...details, class_id: classId || null });
+      ? await save.run('put', `${apiBase}/learners/${learner.learner_id}`, details)
+      : await save.run('post', createUrl, { ...details, class_id: classId || null });
     if (result.ok) onSaved(result.data.learner, result.message);
   };
 
@@ -62,7 +73,7 @@ const LearnerFormModal = ({ learner, classes = [], defaultClassId = '', onClose,
       <Form onSubmit={handleSubmit} noValidate>
         <Modal.Header closeButton>
           <Modal.Title id={titleId} as="h2" className="h5 mb-0">
-            {editing ? `Edit ${learner.first_name} ${learner.last_name}` : 'Add a learner'}
+            {title ?? (editing ? `Edit ${learner.first_name} ${learner.last_name}` : 'Add a learner')}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -117,7 +128,7 @@ const LearnerFormModal = ({ learner, classes = [], defaultClassId = '', onClose,
                   {error('admission_number')}
                 </Form.Group>
               </Col>
-              {!editing && (
+              {!editing && classes.length > 0 && (
                 <Col sm={6}>
                   <Form.Group controlId="learner-class">
                     <Form.Label>Class</Form.Label>

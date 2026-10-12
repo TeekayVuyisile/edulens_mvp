@@ -17,7 +17,6 @@ import {
 import { useApi, useDocumentTitle } from '../../hooks/useApi';
 import { useMutation } from '../../hooks/useMutation';
 import { ageFrom, CAPS_LEVELS, capsLevel, fullName, gradeLabel, initials, plural } from '../../lib/format';
-import './school-admin.css';
 import PageHeader from '../../components/ui/PageHeader';
 import StatusBadge from '../../components/ui/StatusBadge';
 import EmptyState from '../../components/ui/EmptyState';

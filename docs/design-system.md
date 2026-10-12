@@ -107,6 +107,7 @@ Reusable pieces in `frontend/src/components/ui/` (styles in `ui-kit.css`):
 | `ShareLinkDialog` | Invitation / reset link with copy and WhatsApp share |
 | `TableSkeleton` | Placeholder rows while a table loads |
 | `ActivityFeed` | "Who did what, when" timeline for dashboards |
+| `ProgressMeter` | "12 of 30 marked": count plus a thin progress bar (ARIA progressbar) |
 | `CapacityMeter` | Learners / places in a class: number, thin bar, "Full" or "N places left" (ARIA meter) |
 
 Layout helpers: `.el-panel` (+ `__header`, `__body`), `.el-toolbar`, `.el-table-wrap` + `.el-table`,
@@ -125,6 +126,13 @@ Averages are shown as a percentage plus the CAPS achievement level (`capsLevel()
 `lib/format.js`): L7 80%+ … L1 below 30%. The `.el-level--N` pill always says "Level N", and
 its colour (green 5–7, indigo 4, amber 3, red 1–2) is never the only signal. Reports always
 plot all seven levels in order so the distribution isn't distorted by empty levels.
+
+### Marks entry
+
+Marks are typed into a column of inputs (numeric keyboard on phones). Enter moves to the next
+learner; the result (percentage + CAPS level) updates as you type; a mark above the total is
+flagged next to the field with `aria-invalid`. Changed rows are tinted, and a sticky save bar
+says how many changes are unsaved; the browser warns before the tab closes with unsaved marks.
 
 ### Imports
 

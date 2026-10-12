@@ -30,11 +30,10 @@ const SchoolClassDetail = lazy(() => import('./pages/school-admin/ClassDetail'))
 const Reports = lazy(() => import('./pages/school-admin/Reports'));
 
 const TeacherClasses = lazy(() => import('./pages/teacher/Classes'));
-const ClassDetails = lazy(() => import('./pages/teacher/ClassDetails'));
-const AddLearners = lazy(() => import('./pages/teacher/AddLearners'));
+const TeacherClassDetail = lazy(() => import('./pages/teacher/ClassDetail'));
+const LearnerProfile = lazy(() => import('./pages/teacher/LearnerProfile'));
 const Assessments = lazy(() => import('./pages/teacher/Assessments'));
-const AssessmentGradebook = lazy(() => import('./pages/teacher/AssessmentGradebook'));
-const Grading = lazy(() => import('./pages/teacher/Grading'));
+const AssessmentDetail = lazy(() => import('./pages/teacher/AssessmentDetail'));
 const Worksheets = lazy(() => import('./pages/teacher/Worksheets'));
 
 const page = (Component) => (
@@ -78,11 +77,12 @@ export const AppRoutes = () => (
 
         <Route path="teacher" element={<ProtectedRoute allowedRoles={['teacher']} />}>
           <Route path="classes" element={page(TeacherClasses)} />
-          <Route path="classes/:classId" element={page(ClassDetails)} />
-          <Route path="classes/:classId/add-learners" element={page(AddLearners)} />
+          <Route path="classes/:classId" element={page(TeacherClassDetail)} />
+          <Route path="learners/:learnerId" element={page(LearnerProfile)} />
           <Route path="assessments" element={page(Assessments)} />
-          <Route path="assessments/:assessmentId/gradebook" element={page(AssessmentGradebook)} />
-          <Route path="grading" element={page(Grading)} />
+          <Route path="assessments/:assessmentId" element={page(AssessmentDetail)} />
+          {/* Old bookmark: grading is now the "To mark" filter. */}
+          <Route path="grading" element={<Navigate to="/teacher/assessments?status=to_mark" replace />} />
           <Route path="worksheets" element={page(Worksheets)} />
         </Route>
       </Route>

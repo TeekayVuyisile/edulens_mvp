@@ -7,7 +7,6 @@ import { LuClipboardList, LuPlus, LuTriangleAlert, LuUser } from 'react-icons/lu
 import { useApi, useDocumentTitle } from '../../hooks/useApi';
 import { CLASS_GRADES, gradeLabel, plural } from '../../lib/format';
 import { fadeUpItem, staggerContainer } from '../../lib/motion';
-import './school-admin.css';
 import PageHeader from '../../components/ui/PageHeader';
 import FilterTabs from '../../components/ui/FilterTabs';
 import EmptyState from '../../components/ui/EmptyState';

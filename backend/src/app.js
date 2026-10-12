@@ -2,8 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Import middleware
 import { activityLogger } from './middleware/activityLogger.js';
@@ -18,10 +16,6 @@ import curriculumRoutes from './routes/curriculumRoutes.js';
 
 const app = express();
 const isTest = process.env.NODE_ENV === 'test';
-
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Rate limiting (disabled under test so suites can make many requests)
 const limiter = rateLimit({
@@ -67,9 +61,6 @@ app.use(cors(corsOptions));
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Activity logging middleware (writes to the DB after each response; skipped under test)
 if (!isTest) {

@@ -2,11 +2,11 @@ import { useId, useRef, useState } from 'react';
 import { Button, Modal, Spinner, Table } from 'react-bootstrap';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LuCircleCheck, LuDownload, LuFileSpreadsheet, LuTriangleAlert, LuUpload } from 'react-icons/lu';
-import { useMutation } from '../../../hooks/useMutation';
-import { formatDate, plural } from '../../../lib/format';
-import { pageTransition } from '../../../lib/motion';
-import FormAlert from '../../../components/ui/FormAlert';
-import FilterTabs from '../../../components/ui/FilterTabs';
+import { useMutation } from '../../hooks/useMutation';
+import { formatDate, plural } from '../../lib/format';
+import { pageTransition } from '../../lib/motion';
+import FormAlert from '../ui/FormAlert';
+import FilterTabs from '../ui/FilterTabs';
 
 const TEMPLATE = [
   'first_name,last_name,date_of_birth,gender,admission_number,class,guardian_name,guardian_phone,guardian_email',
@@ -26,7 +26,7 @@ const ACCEPT = '.csv,.xlsx,.xls';
  * Imports learners from a spreadsheet in three steps: choose a file, review
  * every row (problems are explained per row), then import the good rows.
  */
-const ImportLearnersModal = ({ onClose, onImported }) => {
+const ImportLearnersModal = ({ url = '/api/school-admin/learners/import', className, onClose, onImported }) => {
   const titleId = useId();
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -42,7 +42,7 @@ const ImportLearnersModal = ({ onClose, onImported }) => {
     const body = new FormData();
     body.append('dry_run', String(dryRun));
     body.append('file', chosen);
-    return request.run('post', '/api/school-admin/learners/import', body);
+    return request.run('post', url, body);
   };
 
   const check = async (chosen) => {
@@ -75,7 +75,7 @@ const ImportLearnersModal = ({ onClose, onImported }) => {
     <Modal aria-labelledby={titleId} show onHide={finish} centered size="lg" backdrop={request.pending ? 'static' : true}>
       <Modal.Header closeButton>
         <Modal.Title id={titleId} as="h2" className="h5 mb-0">
-          Import learners
+          {className ? `Import learners into ${className}` : 'Import learners'}
         </Modal.Title>
       </Modal.Header>
 
@@ -125,10 +125,14 @@ const ImportLearnersModal = ({ onClose, onImported }) => {
                       <strong>First name, last name and date of birth</strong> for every learner.
                     </li>
                     <li>Dates as 2019-03-14 or 14/03/2019.</li>
-                    <li>
-                      Optional: gender, admission number, guardian details, and a <strong>class</strong> that matches one
-                      of your class names exactly.
-                    </li>
+                    {className ? (
+                      <li>Optional: gender, admission number and guardian details. Everyone joins {className}.</li>
+                    ) : (
+                      <li>
+                        Optional: gender, admission number, guardian details, and a <strong>class</strong> that matches
+                        one of your class names exactly.
+                      </li>
+                    )}
                   </ul>
                 </div>
                 <Button variant="light" size="sm" onClick={downloadTemplate} className="d-inline-flex align-items-center gap-2">

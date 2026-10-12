@@ -2,7 +2,6 @@ import {
   LuBookOpen,
   LuBuilding2,
   LuChartColumn,
-  LuClipboardCheck,
   LuClipboardList,
   LuFileText,
   LuLayoutDashboard,
@@ -50,9 +49,8 @@ export const NAVIGATION = {
     {
       heading: 'Teaching',
       items: [
-        { to: '/teacher/classes', label: 'My Classes', icon: LuSchool },
+        { to: '/teacher/classes', label: 'My classes', icon: LuSchool },
         { to: '/teacher/assessments', label: 'Assessments', icon: LuClipboardList },
-        { to: '/teacher/grading', label: 'Grading', icon: LuClipboardCheck },
         { to: '/teacher/worksheets', label: 'Worksheets', icon: LuFileText },
       ],
     },

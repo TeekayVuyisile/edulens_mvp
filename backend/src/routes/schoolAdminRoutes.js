@@ -1,11 +1,10 @@
 import express from 'express';
-import multer from 'multer';
 import { body, query } from 'express-validator';
 import { requireSchoolAdmin } from '../middleware/authMiddleware.js';
 import { validate, validateUuidParams } from '../middleware/validationMiddleware.js';
 import { CLASS_GRADES } from '../models/Class.js';
 import { learnerValidation } from '../services/learnerRules.js';
-import { badRequest } from '../utils/httpError.js';
+import { uploadSpreadsheet } from '../middleware/uploadMiddleware.js';
 import { getDashboard } from '../controllers/schoolAdmin/dashboardController.js';
 import * as teachers from '../controllers/schoolAdmin/teachersController.js';
 import * as learners from '../controllers/schoolAdmin/learnersController.js';
@@ -42,16 +41,6 @@ const pagination = [
 ];
 
 const uuidBody = (field, label) => body(field).isUUID().withMessage(`Choose a ${label}`);
-
-// Spreadsheets are read from memory (never written to disk) and capped at 2 MB.
-const spreadsheet = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
-const uploadSpreadsheet = (req, res, next) =>
-  spreadsheet.single('file')(req, res, (error) => {
-    if (!error) return next();
-    if (error.code === 'LIMIT_FILE_SIZE') return next(badRequest('The file is larger than 2 MB. Split it into smaller files.'));
-    if (error instanceof multer.MulterError) return next(badRequest('Upload one CSV or Excel file in the “file” field'));
-    return next(error);
-  });
 
 // ---- Dashboard ------------------------------------------------------------------
 
@@ -98,7 +87,7 @@ router.post('/learners', validate([
 ]), learners.createLearner);
 
 // Registered before /learners/:learnerId so "import" isn't read as an id.
-router.post('/learners/import', uploadSpreadsheet, learners.importLearners);
+router.post('/learners/import', uploadSpreadsheet, learners.importLearnersFromFile);
 
 router.get('/learners/:learnerId', learners.getLearner);
 router.put('/learners/:learnerId', validate(learnerValidation({ partial: true })), learners.updateLearner);

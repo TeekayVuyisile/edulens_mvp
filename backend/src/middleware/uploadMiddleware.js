@@ -1,51 +1,54 @@
-import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
+import multer from 'multer';
+import { badRequest } from '../utils/httpError.js';
 
-// Ensure uploads directory exists
-const uploadDir = 'uploads/';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Uploads are kept in memory and never written to a public folder:
+// spreadsheets are parsed straight away, resource files are stored in the database.
 
-// Configure storage for assessment resources
-const resourceStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, 'assessment-' + uniqueSuffix + ext);
-  }
-});
+const MB = 1024 * 1024;
 
-// File filter for assessment resources
-const resourceFileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    '.pdf', '.doc', '.docx', '.txt', '.rtf', // Documents
-    '.jpg', '.jpeg', '.png', '.gif', '.webp', // Images
-    '.mp4', '.avi', '.mov', '.wmv', '.mkv',  // Videos
-    '.mp3', '.wav', '.ogg', '.m4a'           // Audio
-  ];
-  
-  const ext = path.extname(file.originalname).toLowerCase();
-  
-  if (allowedTypes.includes(ext)) {
-    cb(null, true);
-  } else {
-    cb(new Error(`File type ${ext} is not allowed. Allowed types: ${allowedTypes.join(', ')}`), false);
-  }
+/** File types a teacher can attach to an assessment, with the MIME type served on download. */
+export const RESOURCE_TYPES = {
+  '.pdf': ['pdf', 'application/pdf'],
+  '.doc': ['document', 'application/msword'],
+  '.docx': ['document', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  '.ppt': ['document', 'application/vnd.ms-powerpoint'],
+  '.pptx': ['document', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  '.txt': ['document', 'text/plain'],
+  '.jpg': ['image', 'image/jpeg'],
+  '.jpeg': ['image', 'image/jpeg'],
+  '.png': ['image', 'image/png'],
+  '.gif': ['image', 'image/gif'],
+  '.webp': ['image', 'image/webp'],
 };
 
-// Create multer instances
-export const uploadResource = multer({
-  storage: resourceStorage,
-  fileFilter: resourceFileFilter,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit for videos
-  }
-});
+export const RESOURCE_MAX_MB = 5;
 
-export const uploadSingle = (fieldName) => uploadResource.single(fieldName);
-export const uploadMultiple = (fieldName, maxCount = 10) => uploadResource.array(fieldName, maxCount);
+/** Wraps a multer middleware so its errors become clear 400s. */
+const friendly = (middleware, { maxMb, field }) => (req, res, next) =>
+  middleware(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === 'LIMIT_FILE_SIZE') return next(badRequest(`The file is larger than ${maxMb} MB.`));
+    if (error instanceof multer.MulterError) return next(badRequest(`Upload one file in the “${field}” field`));
+    return next(error);
+  });
+
+/** One CSV/XLSX register, up to 2 MB, in req.file. */
+export const uploadSpreadsheet = friendly(
+  multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * MB, files: 1 } }).single('file'),
+  { maxMb: 2, field: 'file' }
+);
+
+/** One assessment resource (documents and images), up to 5 MB, in req.file. Optional: links have no file. */
+export const uploadResource = friendly(
+  multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: RESOURCE_MAX_MB * MB, files: 1 },
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (RESOURCE_TYPES[ext]) cb(null, true);
+      else cb(badRequest('Attach a PDF, Word or PowerPoint document, text file or image'));
+    },
+  }).single('file'),
+  { maxMb: RESOURCE_MAX_MB, field: 'file' }
+);

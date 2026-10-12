@@ -71,7 +71,7 @@ describe('role guard', () => {
 
     const [nav] = await screen.findAllByRole('navigation', { name: 'Main navigation' });
     const labels = [...nav.querySelectorAll('a')].map((a) => a.textContent);
-    expect(labels).toEqual(['Dashboard', 'My Classes', 'Assessments', 'Grading', 'Worksheets']);
+    expect(labels).toEqual(['Dashboard', 'My classes', 'Assessments', 'Worksheets']);
   });
 
   it('sends a signed-in user away from the sign-in page', async () => {

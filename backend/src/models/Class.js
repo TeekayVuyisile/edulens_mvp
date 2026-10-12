@@ -206,80 +206,94 @@ class ClassModel {
     );
   }
 
-  // ---- Used by the teacher area ----
+  // ---- Teacher area ----
 
-  /** Class with its primary teacher, current learners and teachers. */
-  static async getById(classId) {
-    const { rows } = await pool.query(
-      `SELECT c.*, ${LEARNER_COUNT} AS current_enrollment, s.school_name,
-              json_build_object('user_id', u.user_id, 'first_name', u.first_name,
-                                'last_name', u.last_name, 'email', u.email) AS primary_teacher,
-              (SELECT json_agg(json_build_object(
-                        'learner_id', l.learner_id, 'first_name', l.first_name, 'last_name', l.last_name,
-                        'enrollment_date', l.enrollment_date, 'academic_status', l.academic_status)
-                      ORDER BY l.last_name, l.first_name)
-               FROM learners l
-               WHERE l.current_class_id = c.class_id AND l.academic_status IN ('active', 'repeated')) AS learners,
-              (SELECT json_agg(json_build_object(
-                        'teacher_id', t.user_id, 'first_name', t.first_name, 'last_name', t.last_name,
-                        'email', t.email, 'is_primary', cta.is_primary))
-               FROM class_teacher_assignments cta
-               JOIN users t ON t.user_id = cta.teacher_id
-               WHERE cta.class_id = c.class_id) AS teachers
-       FROM classes c
-       LEFT JOIN schools s ON s.school_id = c.school_id
-       LEFT JOIN users u ON u.user_id = c.primary_teacher_id
-       WHERE c.class_id = $1`,
-      [classId]
-    );
-    return rows[0];
-  }
-
-  /** Active classes a teacher is assigned to, optionally for one year. */
-  static async getByTeacher(teacherId, academicYear = null) {
+  /** Classes a teacher is assigned to, with their role, size, marking backlog and average. */
+  static async forTeacher(teacherId, { year, includeInactive = false } = {}) {
     const values = [teacherId];
-    let yearFilter = '';
-    if (academicYear) {
-      values.push(academicYear);
-      yearFilter = 'AND c.academic_year = $2';
+    let filters = includeInactive ? '' : 'AND c.is_active';
+    if (year) {
+      values.push(year);
+      filters += ` AND c.academic_year = $${values.length}`;
     }
     const { rows } = await pool.query(
-      `SELECT c.*, s.school_name, ${LEARNER_COUNT} AS learner_count, cta.is_primary
+      `SELECT c.class_id, c.class_name, c.grade_level, c.academic_year, c.max_capacity, c.is_active,
+              cta.is_primary, ${LEARNER_COUNT} AS learner_count, ${TEACHERS_JSON} AS teachers,
+              (SELECT COUNT(*)::int FROM assessments a WHERE a.class_id = c.class_id) AS assessment_count,
+              (SELECT ROUND(AVG(g.percentage), 1)::float FROM grades g
+               JOIN assessments a ON a.assessment_id = g.assessment_id
+               WHERE a.class_id = c.class_id AND g.is_graded) AS average
        FROM class_teacher_assignments cta
        JOIN classes c ON c.class_id = cta.class_id
-       JOIN schools s ON s.school_id = c.school_id
-       WHERE cta.teacher_id = $1 AND c.is_active ${yearFilter}
-       ORDER BY c.grade_level, c.class_name`,
+       WHERE cta.teacher_id = $1 ${filters}
+       ORDER BY c.academic_year DESC, CASE c.grade_level WHEN 'R' THEN 0 ELSE 1 END, c.grade_level, c.class_name`,
       values
     );
     return rows;
   }
 
-  static async getStatistics(classId) {
-    const [learners, assessments, average, recent] = await Promise.all([
+  /** The class (with the teacher's role in it) if the teacher is assigned to it. */
+  static async findForTeacher(classId, teacherId) {
+    const { rows } = await pool.query(
+      `SELECT c.*, cta.is_primary, ${LEARNER_COUNT} AS learner_count, ${TEACHERS_JSON} AS teachers
+       FROM classes c
+       JOIN class_teacher_assignments cta ON cta.class_id = c.class_id AND cta.teacher_id = $2
+       WHERE c.class_id = $1`,
+      [classId, teacherId]
+    );
+    return rows[0];
+  }
+
+  /**
+   * Learners × assessments for one class (optionally one term): the columns,
+   * and each learner's percentage per assessment plus their average.
+   */
+  static async marksheet(classId, { term } = {}) {
+    const values = [classId];
+    let termFilter = '';
+    if (term) {
+      values.push(term);
+      termFilter = 'AND a.term_number = $2';
+    }
+    const [assessments, learners, marks] = await Promise.all([
       pool.query(
-        `SELECT COUNT(*)::int AS count FROM learners
-         WHERE current_class_id = $1 AND academic_status IN ('active', 'repeated')`,
-        [classId]
+        `SELECT a.assessment_id, a.assessment_name, a.assessment_type, a.term_number, a.total_marks::float AS total_marks,
+                a.scheduled_date, s.subject_name
+         FROM assessments a
+         LEFT JOIN subjects s ON s.subject_id = a.subject_id
+         WHERE a.class_id = $1 ${termFilter}
+         ORDER BY COALESCE(a.scheduled_date, a.created_at::date), a.created_at`,
+        values
       ),
-      pool.query('SELECT COUNT(*)::int AS count FROM assessments WHERE class_id = $1', [classId]),
+      ClassModel.learners(classId),
       pool.query(
-        `SELECT ROUND(AVG(g.percentage), 2) AS average_score
+        `SELECT g.learner_id, g.assessment_id, g.percentage::float AS percentage
          FROM grades g JOIN assessments a ON a.assessment_id = g.assessment_id
-         WHERE a.class_id = $1 AND g.percentage IS NOT NULL`,
-        [classId]
-      ),
-      pool.query(
-        `SELECT assessment_name, scheduled_date, assessment_type FROM assessments
-         WHERE class_id = $1 ORDER BY scheduled_date DESC LIMIT 5`,
-        [classId]
+         WHERE a.class_id = $1 AND g.is_graded ${termFilter}`,
+        values
       ),
     ]);
+
+    const byLearner = new Map();
+    for (const m of marks.rows) {
+      if (!byLearner.has(m.learner_id)) byLearner.set(m.learner_id, {});
+      byLearner.get(m.learner_id)[m.assessment_id] = m.percentage;
+    }
+    const round = (n) => Math.round(n * 10) / 10;
     return {
-      totalLearners: learners.rows[0].count,
-      totalAssessments: assessments.rows[0].count,
-      averageScore: Number.parseFloat(average.rows[0].average_score) || 0,
-      recentAssessments: recent.rows,
+      assessments: assessments.rows,
+      learners: learners.map((l) => {
+        const scores = byLearner.get(l.learner_id) ?? {};
+        const values = Object.values(scores);
+        return {
+          learner_id: l.learner_id,
+          first_name: l.first_name,
+          last_name: l.last_name,
+          has_special_needs: l.has_special_needs,
+          marks: scores,
+          average: values.length ? round(values.reduce((a, b) => a + b, 0) / values.length) : null,
+        };
+      }),
     };
   }
 }

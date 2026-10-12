@@ -116,3 +116,28 @@ export const whatsappLink = (phone) => {
   if (/^0\d{9}$/.test(digits)) digits = `27${digits.slice(1)}`;
   return digits.length >= 10 ? `https://wa.me/${digits}` : null;
 };
+
+/**
+ * The school term a date falls in. South African public schools run four terms:
+ * roughly Jan–Mar, Apr–Jun, Jul–Sep and Oct–Dec.
+ */
+export const currentTerm = (date = new Date()) => String(Math.floor(date.getMonth() / 3) + 1);
+
+export const TERMS = ['1', '2', '3', '4'];
+
+export const ASSESSMENT_TYPES = {
+  test: 'Test',
+  quiz: 'Quiz',
+  worksheet: 'Worksheet',
+  assignment: 'Assignment',
+  project: 'Project',
+};
+
+/** "12 of 30 marked" style progress numbers. */
+export const markingState = (assessment) => {
+  if (assessment.learner_count === 0) return 'empty';
+  return assessment.marked_count >= assessment.learner_count ? 'done' : assessment.marked_count > 0 ? 'partial' : 'none';
+};
+
+/** Marks out of a total, without trailing zeros: 17.5 / 20 */
+export const formatMarks = (value) => (value === null || value === undefined ? '' : String(Number(value)));

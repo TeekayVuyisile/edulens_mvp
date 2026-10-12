@@ -1,237 +1,110 @@
-import React, { useState, useEffect } from "react";
-import {
-  Card,
-  Button,
-  Row,
-  Col,
-  Badge,
-  ProgressBar,
-  Table,
-  Form,
-  InputGroup,
-} from "react-bootstrap";
-import { Link } from "react-router-dom";
-import { toast } from "react-hot-toast";
-import axios from "axios";
+import { useState } from 'react';
+import { Button, Form } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { LuSchool, LuStar, LuUsers } from 'react-icons/lu';
+import { useApi, useDocumentTitle } from '../../hooks/useApi';
+import { capsLevel, gradeLabel, plural } from '../../lib/format';
+import { fadeUpItem, staggerContainer } from '../../lib/motion';
+import PageHeader from '../../components/ui/PageHeader';
+import EmptyState from '../../components/ui/EmptyState';
+import StatusBadge from '../../components/ui/StatusBadge';
+import FullPageLoader from '../../components/ui/FullPageLoader';
 
-const TeacherClasses = () => {
-  const [classes, setClasses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  useEffect(() => {
-    fetchClasses();
-  }, []);
-
-  const fetchClasses = async () => {
-    try {
-      const response = await axios.get("/api/teacher/dashboard");
-      setClasses(response.data.data.classes || []);
-    } catch {
-      toast.error("Failed to fetch classes");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredClasses = classes.filter(
-    (cls) =>
-      cls.class_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cls.grade_level.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div>
-      <div className="mb-4">
-        <h1 className="h3 mb-2">My Classes</h1>
-        <p className="text-muted">
-          View and manage all classes assigned to you
-        </p>
-      </div>
-
-      <Card className="border-0 shadow-sm mb-4">
-        <Card.Body>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <div className="w-100 me-3">
-              <InputGroup>
-                <InputGroup.Text>
-                  <i className="bi bi-search"></i>
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search classes..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-            </div>
-          ) : filteredClasses.length === 0 ? (
-            <div className="text-center py-5">
-              <i className="bi bi-collection display-1 text-muted mb-3"></i>
-              <h4>No Classes Assigned</h4>
-              <p className="text-muted">
-                You haven't been assigned to any classes yet.
-              </p>
-            </div>
-          ) : (
-            <Row className="g-4">
-              {filteredClasses.map((cls) => (
-                <Col key={cls.class_id} xs={12} md={6} lg={4}>
-                  <Card className="border h-100">
-                    <Card.Body>
-                      <div className="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                          <Badge bg="primary" className="mb-2">
-                            Grade {cls.grade_level}
-                          </Badge>
-                          <h5 className="mb-1">{cls.class_name}</h5>
-                          <p className="text-muted small mb-0">
-                            Academic Year: {cls.academic_year}
-                          </p>
-                        </div>
-                        <div className="bg-primary-subtle p-2 rounded">
-                          <i className="bi bi-people-fill text-primary fs-4"></i>
-                        </div>
-                      </div>
-
-                      <div className="mb-3">
-                        <div className="d-flex justify-content-between small text-muted mb-1">
-                          <span>Learners</span>
-                          <span>
-                            {cls.learner_count || 0}/{cls.max_capacity || 30}
-                          </span>
-                        </div>
-                        <ProgressBar
-                          now={
-                            ((cls.learner_count || 0) /
-                              (cls.max_capacity || 30)) *
-                            100
-                          }
-                          style={{ height: "6px" }}
-                        />
-                      </div>
-
-                      {cls.stats && (
-                        <div className="mb-3">
-                          <div className="row text-center">
-                            <div className="col-4">
-                              <div className="fw-bold">
-                                {cls.stats.totalAssessments || 0}
-                              </div>
-                              <div className="text-muted small">
-                                Assessments
-                              </div>
-                            </div>
-                            <div className="col-4">
-                              <div className="fw-bold">
-                                {cls.stats.averageScore || 0}%
-                              </div>
-                              <div className="text-muted small">Avg Score</div>
-                            </div>
-                            <div className="col-4">
-                              <div className="fw-bold">
-                                {cls.stats.totalLearners || 0}
-                              </div>
-                              <div className="text-muted small">Learners</div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="d-grid gap-2">
-                        <Button
-                          as={Link}
-                          to={`/teacher/classes/${cls.class_id}`}
-                          variant="outline-primary"
-                        >
-                          <i className="bi bi-eye me-2"></i>
-                          View Class Details
-                        </Button>
-                        <Button
-                          as={Link}
-                          to={`/teacher/assessments?class=${cls.class_id}`}
-                          variant="outline-success"
-                        >
-                          <i className="bi bi-clipboard me-2"></i>
-                          Manage Assessments
-                        </Button>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Class Details Section */}
-      {filteredClasses.length > 0 && (
-        <Card className="border-0 shadow-sm">
-          <Card.Body>
-            <h5 className="mb-3">Recent Class Activity</h5>
-            <div className="table-responsive">
-              <Table hover>
-                <thead>
-                  <tr>
-                    <th>Class</th>
-                    <th>Recent Assessment</th>
-                    <th>Avg Score</th>
-                    <th>Due Assignments</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredClasses.slice(0, 3).map((cls) => (
-                    <tr key={cls.class_id}>
-                      <td>
-                        <strong>{cls.class_name}</strong>
-                        <div className="text-muted small">
-                          Grade {cls.grade_level}
-                        </div>
-                      </td>
-                      <td>
-                        {cls.stats?.recentAssessments?.[0]?.assessment_name ||
-                          "No assessments"}
-                        <div className="text-muted small">
-                          {cls.stats?.recentAssessments?.[0]?.scheduled_date ||
-                            ""}
-                        </div>
-                      </td>
-                      <td>
-                        <Badge
-                          bg={
-                            cls.stats?.averageScore > 70 ? "success" : "warning"
-                          }
-                        >
-                          {cls.stats?.averageScore || 0}%
-                        </Badge>
-                      </td>
-                      <td>
-                        <Badge bg="danger">3</Badge>
-                      </td>
-                      <td>
-                        <Button size="sm" variant="outline-primary">
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </Card.Body>
-        </Card>
+const TeacherClassCard = ({ klass }) => (
+  <Link to={`/teacher/classes/${klass.class_id}`} className="el-class-card card-interactive">
+    <div className="el-class-card__head">
+      <span>
+        <span className="el-class-card__name d-block">{klass.class_name}</span>
+        <span className="el-cell-secondary">
+          {gradeLabel(klass.grade_level)} · {klass.academic_year}
+        </span>
+      </span>
+      {klass.is_active ? (
+        klass.is_primary && (
+          <span className="el-chip" title="You’re the class teacher">
+            <LuStar aria-hidden="true" /> Class teacher
+          </span>
+        )
+      ) : (
+        <StatusBadge status="inactive" label="Past class" />
       )}
     </div>
+    <dl className="el-class-card__facts">
+      <div>
+        <dt>Learners</dt>
+        <dd className="tabular-nums">{klass.learner_count}</dd>
+      </div>
+      <div>
+        <dt>Assessments</dt>
+        <dd className="tabular-nums">{klass.assessment_count}</dd>
+      </div>
+      <div>
+        <dt>Average</dt>
+        <dd className="tabular-nums">
+          {klass.average === null ? '—' : (
+            <>
+              {klass.average}% <span className="el-cell-secondary">L{capsLevel(klass.average)}</span>
+            </>
+          )}
+        </dd>
+      </div>
+    </dl>
+  </Link>
+);
+
+const Classes = () => {
+  useDocumentTitle('My classes');
+  const [showPast, setShowPast] = useState(false);
+  const { data, loading, error, reload } = useApi('/api/teacher/classes', { include_inactive: showPast ? 'true' : undefined });
+
+  if (loading && !data) return <FullPageLoader label="Loading your classes…" />;
+
+  const classes = data?.classes ?? [];
+  const learners = classes.filter((c) => c.is_active).reduce((n, c) => n + c.learner_count, 0);
+
+  return (
+    <>
+      <PageHeader
+        title="My classes"
+        description={
+          classes.length > 0
+            ? `${plural(classes.filter((c) => c.is_active).length, 'class', 'classes')} · ${plural(learners, 'learner')}`
+            : 'The classes your school admin has given you.'
+        }
+        actions={
+          <Form.Check
+            type="switch"
+            id="show-past-classes"
+            label="Show past classes"
+            checked={showPast}
+            onChange={(e) => setShowPast(e.target.checked)}
+            className="mb-0"
+          />
+        }
+      />
+
+      {error && !data ? (
+        <EmptyState icon={LuSchool} title="Couldn’t load your classes" action={<Button onClick={reload}>Try again</Button>}>
+          {error}
+        </EmptyState>
+      ) : classes.length === 0 ? (
+        <section className="el-panel">
+          <EmptyState icon={LuUsers} title="No classes yet">
+            Your school admin assigns teachers to classes. Once you have a class, its learners and assessments appear here.
+          </EmptyState>
+        </section>
+      ) : (
+        <motion.div className="el-class-grid" variants={staggerContainer()} initial="initial" animate="animate">
+          {classes.map((klass, index) => (
+            <motion.div key={klass.class_id} variants={index < 8 ? fadeUpItem : undefined}>
+              <TeacherClassCard klass={klass} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
+    </>
   );
 };
 
-export default TeacherClasses;
+export default Classes;

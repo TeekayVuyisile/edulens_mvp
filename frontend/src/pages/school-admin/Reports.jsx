@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { LuChartColumn, LuCircleCheck, LuClipboardList, LuTrendingUp, LuUsers, LuLifeBuoy } from 'react-icons/lu';
 import { useApi, useDocumentTitle } from '../../hooks/useApi';
 import { CAPS_LEVELS, CLASS_GRADES, capsLevel, gradeLabel } from '../../lib/format';
-import './school-admin.css';
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import EmptyState from '../../components/ui/EmptyState';

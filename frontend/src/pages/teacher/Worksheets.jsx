@@ -48,7 +48,7 @@ const Worksheets = () => {
   const fetchInitialData = async () => {
     try {
       setDataLoading(true);
-      const response = await axios.get('/api/teacher/assessment-data');
+      const response = await axios.get('/api/teacher/worksheets/options');
       if (response.data.status === 'success') {
         setCurricula(response.data.data.curricula || []);
         setAllTopics(response.data.data.topics_by_subject || {});

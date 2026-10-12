@@ -760,3 +760,4 @@
   background: var(--el-accent-strong);
   vertical-align: middle;
 }
+.el-meter--done .el-meter__fill { background: var(--bs-success, #15803d); }

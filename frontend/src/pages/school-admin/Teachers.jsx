@@ -6,7 +6,6 @@ import { LuPencil, LuPower, LuSend, LuUserPlus, LuUsers } from 'react-icons/lu';
 import { useApi, useDebouncedValue, useDocumentTitle } from '../../hooks/useApi';
 import { useMutation } from '../../hooks/useMutation';
 import { accountStatus, capitalize, initials, timeAgo } from '../../lib/format';
-import './school-admin.css';
 import PageHeader from '../../components/ui/PageHeader';
 import FilterTabs from '../../components/ui/FilterTabs';
 import SearchInput from '../../components/ui/SearchInput';

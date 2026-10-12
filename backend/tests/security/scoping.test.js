@@ -24,11 +24,11 @@ const createClassroom = async () => {
   return { school, klass, teacher, learner, assessment };
 };
 
-const bulkGrade = (teacher, assessmentId, grades) =>
+const bulkGrade = (teacher, assessmentId, marks) =>
   request(app)
-    .post(`/api/teacher/assessments/${assessmentId}/bulk-grade`)
+    .put(`/api/teacher/assessments/${assessmentId}/marks`)
     .set(authHeader(teacher))
-    .send({ grades });
+    .send({ marks });
 
 describe('teacher: grading', () => {
   beforeEach(resetDb);

@@ -38,5 +38,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
     css: false,
+    // A page's first lazy import (e.g. a dashboard with charts) can take several seconds in jsdom;
+    // the per-test limit must be longer than findBy*'s 5s wait (src/test/setup.js).
+    testTimeout: 15000,
   },
 });

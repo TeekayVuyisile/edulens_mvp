@@ -2,7 +2,9 @@ import { parse } from 'csv-parse/sync';
 import xlsx from 'xlsx';
 import pool from '../config/database.js';
 import { badRequest } from '../utils/httpError.js';
-import { CURRENT_STATUSES } from '../models/Learner.js';
+import Learner, { CURRENT_STATUSES } from '../models/Learner.js';
+import { withTransaction } from '../db/transaction.js';
+import { onDuplicate } from '../utils/httpError.js';
 import { ageOn, MAX_LEARNER_AGE, MIN_LEARNER_AGE, normaliseGender } from './learnerRules.js';
 
 // Reads a class register exported from a spreadsheet, checks every row and
@@ -151,8 +153,9 @@ const nameKey = (first, last, dob) => `${first.toLowerCase()}|${last.toLowerCase
 /**
  * Checks parsed rows against the school's register and classes.
  * Every row comes back with `errors` (blocking) — an empty list means it will be imported.
+ * With `classId`, every row goes into that class and any "class" column is ignored.
  */
-export const checkRows = async (rows, schoolId, { today = new Date() } = {}) => {
+export const checkRows = async (rows, schoolId, { today = new Date(), classId } = {}) => {
   const [{ rows: existing }, { rows: classes }] = await Promise.all([
     pool.query(
       `SELECT first_name, last_name, to_char(date_of_birth, 'YYYY-MM-DD') AS dob, LOWER(admission_number) AS admission
@@ -174,10 +177,14 @@ export const checkRows = async (rows, schoolId, { today = new Date() } = {}) => 
   const knownNames = new Set(existing.map((l) => nameKey(l.first_name, l.last_name, l.dob)));
   const knownAdmissions = new Set(existing.map((l) => l.admission).filter(Boolean));
   const classByName = new Map();
+  const classById = new Map();
   for (const klass of classes) {
+    const entry = { ...klass, free: Math.max(0, klass.max_capacity - klass.enrolled) };
+    classById.set(klass.class_id, entry);
     const key = klass.class_name.trim().toLowerCase();
-    if (!classByName.has(key)) classByName.set(key, { ...klass, free: Math.max(0, klass.max_capacity - klass.enrolled) });
+    if (!classByName.has(key)) classByName.set(key, entry);
   }
+  if (classId && !classById.has(classId)) throw badRequest('This class is no longer active');
 
   const seenNames = new Map();
   const seenAdmissions = new Map();
@@ -238,8 +245,8 @@ export const checkRows = async (rows, schoolId, { today = new Date() } = {}) => 
       else seenNames.set(key, row.line);
     }
 
-    let klass = null;
-    if (row.class_name) {
+    let klass = classId ? classById.get(classId) : null;
+    if (!classId && row.class_name) {
       klass = classByName.get(row.class_name.trim().toLowerCase());
       if (!klass) fail('class_name', `There’s no active class called “${row.class_name}”`);
     }
@@ -268,3 +275,44 @@ export const summarise = (checked) => ({
   ready: checked.filter((r) => r.errors.length === 0).length,
   withErrors: checked.filter((r) => r.errors.length > 0).length,
 });
+
+/**
+ * The whole import: read the file, check every row, and (unless dryRun)
+ * add the error-free rows in one transaction and log the import.
+ * @returns {{ summary, rows, unknownColumns }} — after a real run, rows are only those skipped
+ */
+export const importLearners = async ({ file, schoolId, importedBy, dryRun, classId }) => {
+  if (!file) throw badRequest('Choose a CSV or Excel file to import');
+  const { rows, unknownColumns } = readSpreadsheet(file);
+  const checked = await checkRows(rows, schoolId, { classId });
+  const ready = checked.filter((row) => row.errors.length === 0);
+  const skipped = checked.filter((row) => row.errors.length > 0);
+
+  if (dryRun) return { summary: summarise(checked), rows: checked, unknownColumns };
+  if (ready.length === 0) throw badRequest('None of the rows can be imported. Fix the problems shown and try again.');
+
+  await withTransaction(async (client) => {
+    for (const row of ready) {
+      await onDuplicate(
+        Learner.create({ ...row.data, school_id: schoolId }, client),
+        'Another learner already has this admission number'
+      );
+    }
+    await client.query(
+      `INSERT INTO bulk_import_logs (school_id, imported_by, import_type, file_name, total_records,
+         successful_records, failed_records, error_details, import_status, completed_at)
+       VALUES ($1, $2, 'learners', $3, $4, $5, $6, $7, 'completed', CURRENT_TIMESTAMP)`,
+      [
+        schoolId, importedBy, file.originalname, checked.length, ready.length, skipped.length,
+        JSON.stringify(skipped.map(({ line, errors }) => ({ line, errors }))),
+      ]
+    );
+  });
+
+  return { summary: { ...summarise(checked), imported: ready.length }, rows: skipped, unknownColumns };
+};
+
+/** "3 learners were imported; 1 row was skipped" */
+export const importMessage = ({ imported, withErrors }) =>
+  `${imported} learner${imported === 1 ? ' was' : 's were'} imported` +
+  (withErrors ? `; ${withErrors} row${withErrors === 1 ? ' was' : 's were'} skipped` : '');
