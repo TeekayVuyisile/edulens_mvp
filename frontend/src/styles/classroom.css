@@ -431,3 +431,219 @@
     box-shadow: none;
   }
 }
+
+/* ---- Worksheets (printable) -------------------------------------------- */
+.el-ws {
+  max-width: 50rem;
+  margin: 0 auto;
+  padding: 2rem 2.25rem;
+  background: #fff;
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-lg);
+  box-shadow: var(--el-shadow-sm);
+  color: #0f172a;
+  font-size: 1.125rem; /* young readers */
+  line-height: 1.7;
+}
+
+.el-ws--editing {
+  font-size: 1rem;
+}
+
+.el-ws__meta {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--el-text-muted);
+}
+
+.el-ws__title {
+  margin: 0.25rem 0 1rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.el-ws__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.el-ws__field {
+  display: inline-block;
+  width: 12rem;
+  border-bottom: 1.5px solid #0f172a;
+}
+
+.el-ws__field--short { width: 7rem; }
+.el-ws__field--tiny { width: 2.5rem; }
+
+.el-ws__instructions {
+  padding: 0.75rem 1rem;
+  border-radius: var(--el-radius);
+  background: var(--el-accent-soft);
+  font-weight: 600;
+}
+
+.el-ws__questions {
+  padding-left: 1.5rem;
+  margin: 1.5rem 0 0;
+}
+
+.el-ws__question {
+  margin-bottom: 1.5rem;
+  padding-left: 0.25rem;
+  break-inside: avoid;
+}
+
+.el-ws__prompt {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.el-ws__marks {
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--el-text-muted);
+}
+
+.el-ws__blank {
+  display: inline-block;
+  width: 4rem;
+  margin: 0 0.25rem;
+  border-bottom: 1.5px solid #0f172a;
+}
+
+.el-ws__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.el-ws__bubble {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.25rem;
+  border: 1.5px solid #0f172a;
+  border-radius: 50%;
+  vertical-align: -0.1rem;
+}
+
+.el-ws__matching {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.el-ws__lines {
+  height: 4.5rem;
+  background-image: repeating-linear-gradient(transparent 0 2.2rem, #94a3b8 2.2rem 2.25rem);
+}
+
+.el-ws__answers {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 2px dashed var(--el-border-strong);
+  font-size: 1rem;
+  break-before: page; /* the answer key prints on its own page */
+}
+
+.el-ws__answers h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.el-ws__notes {
+  margin-top: 1rem;
+  color: var(--el-text-muted);
+}
+
+.el-ws-edit {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius);
+  background: var(--el-canvas);
+}
+
+.el-worksheet-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.el-worksheet-card {
+  display: grid;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 1.125rem 1.25rem;
+  background: var(--el-surface);
+  border: 1px solid var(--el-border);
+  border-radius: var(--el-radius-lg);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.el-worksheet-card:hover {
+  color: inherit;
+  border-color: var(--el-primary-soft-strong);
+  box-shadow: var(--el-shadow);
+}
+
+.el-worksheet-card:focus-visible {
+  outline: 3px solid var(--el-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 575.98px) {
+  .el-ws {
+    padding: 1.25rem 1rem;
+  }
+
+  .el-ws__matching {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Printing: only the worksheet, on plain paper. */
+@media print {
+  .el-sidebar,
+  .el-topbar,
+  .el-skip-link,
+  .el-no-print,
+  .el-page-header,
+  [data-react-hot-toast] {
+    display: none !important;
+  }
+
+  body,
+  .el-main,
+  .el-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .el-ws {
+    max-width: none;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+}
+
+/* Form beside a larger preview (worksheet maker) */
+@media (min-width: 1200px) {
+  .el-split.el-split--form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  }
+}

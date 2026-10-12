@@ -24,5 +24,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// Pages are lazy-loaded; the first import of a page can take over a second in jsdom.
-configure({ asyncUtilTimeout: 5000 });
+// Pages are lazy-loaded; the first import of a page can take several seconds when
+// many test files run in parallel, so waits are generous (they only cost time when slow).
+configure({ asyncUtilTimeout: 20000 });

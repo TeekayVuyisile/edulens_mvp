@@ -36,6 +36,8 @@ const LearnerProfile = lazy(() => import('./pages/teacher/LearnerProfile'));
 const Assessments = lazy(() => import('./pages/teacher/Assessments'));
 const AssessmentDetail = lazy(() => import('./pages/teacher/AssessmentDetail'));
 const Worksheets = lazy(() => import('./pages/teacher/Worksheets'));
+const WorksheetCreate = lazy(() => import('./pages/teacher/WorksheetCreate'));
+const WorksheetDetail = lazy(() => import('./pages/teacher/WorksheetDetail'));
 
 const page = (Component) => (
   <Suspense fallback={<FullPageLoader label="Loading page…" />}>
@@ -86,6 +88,8 @@ export const AppRoutes = () => (
           {/* Old bookmark: grading is now the "To mark" filter. */}
           <Route path="grading" element={<Navigate to="/teacher/assessments?status=to_mark" replace />} />
           <Route path="worksheets" element={page(Worksheets)} />
+          <Route path="worksheets/new" element={page(WorksheetCreate)} />
+          <Route path="worksheets/:worksheetId" element={page(WorksheetDetail)} />
         </Route>
       </Route>
     </Route>

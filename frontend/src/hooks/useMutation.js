@@ -17,12 +17,13 @@ export const useMutation = () => {
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  const run = useCallback(async (method, url, body) => {
+  // config: extra axios options, e.g. { timeout } for slow requests.
+  const run = useCallback(async (method, url, body, config = {}) => {
     setPending(true);
     setError(null);
     setFieldErrors({});
     try {
-      const res = await http.request({ method, url, data: body });
+      const res = await http.request({ ...config, method, url, data: body });
       return { ok: true, data: res.data.data, message: res.data.message };
     } catch (err) {
       const fields = fieldErrorsFrom(err);

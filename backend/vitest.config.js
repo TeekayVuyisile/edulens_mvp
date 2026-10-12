@@ -21,6 +21,8 @@ Object.assign(process.env, {
   JWT_EXPIRE: '1h',
   // Never send real email from tests, even if .env has SMTP settings.
   SMTP_HOST: '',
+  // Never call the paid AI API from tests; worksheet tests mock the generator.
+  OPENAI_API_KEY: '',
   FRONTEND_URL: 'http://localhost:5173',
 });
 

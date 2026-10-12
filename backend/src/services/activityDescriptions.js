@@ -54,6 +54,9 @@ const PATTERNS = [
   ['POST', `/api/teacher/classes/${ID}/learners/import`, 'Imported learners into their class'],
   ['PUT', `/api/teacher/learners/${ID}`, 'Updated a learner'],
   ['POST', '/api/teacher/worksheets/generate', 'Generated a worksheet'],
+  ['POST', '/api/teacher/worksheets/library', 'Saved a worksheet to the library'],
+  ['PUT', `/api/teacher/worksheets/library/${ID}`, 'Edited a worksheet'],
+  ['DELETE', `/api/teacher/worksheets/library/${ID}`, 'Deleted a worksheet'],
 ].map(([method, path, label]) => ({ method, regex: new RegExp(`^${path}$`), label }));
 
 const VERBS = { POST: 'Created', PUT: 'Updated', PATCH: 'Updated', DELETE: 'Deleted' };

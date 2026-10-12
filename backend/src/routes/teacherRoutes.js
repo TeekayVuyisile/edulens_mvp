@@ -5,13 +5,21 @@ import { validate, validateUuidParams } from '../middleware/validationMiddleware
 import { uploadResource, uploadSpreadsheet } from '../middleware/uploadMiddleware.js';
 import { ASSESSMENT_TYPES, TERMS } from '../models/Assessment.js';
 import { learnerValidation } from '../services/learnerRules.js';
+import { CLASS_GRADES } from '../models/Class.js';
+import {
+  DIFFICULTIES,
+  LANGUAGES,
+  MAX_QUESTIONS,
+  MIN_QUESTIONS,
+  QUESTION_TYPES,
+} from '../services/worksheets/schema.js';
 import * as classes from '../controllers/teacher/classesController.js';
 import * as assessments from '../controllers/teacher/assessmentsController.js';
 import * as worksheets from '../controllers/teacher/worksheetsController.js';
 
 const router = express.Router();
 
-validateUuidParams(router, ['assessmentId', 'classId', 'learnerId', 'requestId', 'resourceId']);
+validateUuidParams(router, ['assessmentId', 'classId', 'learnerId', 'requestId', 'resourceId', 'worksheetId']);
 
 router.use(requireTeacher);
 
@@ -81,26 +89,34 @@ router.post('/assessments/:assessmentId/resources', uploadResource, assessments.
 router.get('/assessments/:assessmentId/resources/:resourceId/download', assessments.downloadResource);
 router.delete('/assessments/:assessmentId/resources/:resourceId', assessments.deleteResource);
 
-// ---- AI worksheets (rebuilt in Phase 6) ---------------------------------------------
+// ---- AI worksheets ----------------------------------------------------------------
+
+router.get('/worksheets/options', worksheets.getOptions);
 
 router.post('/worksheets/generate', validate([
-  body('curriculum_id').isUUID(),
-  body('subject_id').isUUID(),
-  body('topic_id').isUUID(),
-  body('grade_level').isIn(['R', '1', '2', '3']),
-  body('difficulty').isIn(['easy', 'medium', 'hard', 'mixed']),
-  body('number_of_questions').isInt({ min: 1, max: 50 }),
-]), worksheets.generateWorksheet);
+  body('subject_id').isUUID().withMessage('Choose a subject'),
+  body('topic_id').optional({ values: 'falsy' }).isUUID().withMessage('Choose a topic'),
+  body('grade_level').isIn(CLASS_GRADES).withMessage('Choose a grade'),
+  body('difficulty').isIn(DIFFICULTIES).withMessage('Choose a difficulty'),
+  body('number_of_questions').isInt({ min: MIN_QUESTIONS, max: MAX_QUESTIONS })
+    .withMessage(`Choose ${MIN_QUESTIONS} to ${MAX_QUESTIONS} questions`).toInt(),
+  body('question_types').isArray({ min: 1 }).withMessage('Choose at least one kind of question'),
+  body('question_types.*').isIn(QUESTION_TYPES).withMessage('Unknown question type'),
+  body('language').isIn(LANGUAGES).withMessage('Choose a language'),
+  body('specific_instructions').optional({ values: 'null' }).isString().isLength({ max: 500 })
+    .withMessage('Keep extra instructions under 500 characters'),
+]), worksheets.generate);
 
-router.post('/worksheets/save', validate([
-  body('request_id').isUUID(),
-  body('worksheet_title').notEmpty(),
-  body('content_html').notEmpty(),
-]), worksheets.saveWorksheet);
+router.get('/worksheets/requests', worksheets.listRequests);
+router.get('/worksheets/requests/:requestId', worksheets.getRequest);
 
-router.get('/worksheets/options', worksheets.getWorksheetOptions);
-router.get('/worksheets/history', worksheets.getWorksheetHistory);
-router.get('/worksheets/history/:requestId', worksheets.getWorksheetDetails);
-router.get('/worksheets/saved', worksheets.getSavedWorksheets);
+router.get('/worksheets/library', validate([query('grade').optional().isIn(CLASS_GRADES)]), worksheets.listLibrary);
+router.post('/worksheets/library', validate([
+  body('request_id').isUUID().withMessage('Invalid worksheet'),
+  body('worksheet').optional().isObject(),
+]), worksheets.saveToLibrary);
+router.get('/worksheets/library/:worksheetId', worksheets.getWorksheet);
+router.put('/worksheets/library/:worksheetId', validate([body('worksheet').isObject().withMessage('Send the worksheet')]), worksheets.updateWorksheet);
+router.delete('/worksheets/library/:worksheetId', worksheets.deleteWorksheet);
 
 export default router;
