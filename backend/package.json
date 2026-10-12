@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "migrate": "node src/config/migrate.js",
-    "seed": "node src/config/seed.js"
+    "seed": "node src/config/seed.js",
+    "seed:demo": "node src/config/seedDemo.js"
   },
   "keywords": [],
   "author": "",

@@ -1,898 +1,328 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Button, Card, Form, InputGroup, Modal, Row, Col, Badge, Accordion, Alert } from 'react-bootstrap';
-import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import { useMemo, useState } from 'react';
+import { Button, Form } from 'react-bootstrap';
+import { useSearchParams } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import {
+  LuArchive,
+  LuArchiveRestore,
+  LuBookOpen,
+  LuChevronRight,
+  LuLayers,
+  LuPencil,
+  LuPlus,
+  LuTrash2,
+} from 'react-icons/lu';
+import { useApi, useDocumentTitle } from '../../hooks/useApi';
+import { useMutation } from '../../hooks/useMutation';
+import { gradeLabel, plural } from '../../lib/format';
+import { reveal } from '../../lib/motion';
+import PageHeader from '../../components/ui/PageHeader';
+import EmptyState from '../../components/ui/EmptyState';
+import StatusBadge from '../../components/ui/StatusBadge';
+import RowActions from '../../components/ui/RowActions';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import FullPageLoader from '../../components/ui/FullPageLoader';
+import CurriculumItemModal from './components/CurriculumItemModal';
+import './curricula.css';
+
+const ID = { curriculum: 'curriculum_id', subject: 'subject_id', topic: 'topic_id' };
+const NAME = { curriculum: 'curriculum_name', subject: 'subject_name', topic: 'topic_name' };
+const PATH = { curriculum: 'curricula', subject: 'subjects', topic: 'topics' };
+
+const topicCount = (curriculum) => curriculum.subjects.reduce((n, s) => n + s.topics.length, 0);
 
 const Curricula = () => {
-  const [curricula, setCurricula] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [showTopicModal, setShowTopicModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedCurriculum, setSelectedCurriculum] = useState(null);
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedItemType, setSelectedItemType] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState({
-    curriculum_name: '',
-    description: '',
+  useDocumentTitle('Curricula');
+  const [showArchived, setShowArchived] = useState(false);
+  const { data, loading, error, reload } = useApi('/api/super-admin/curricula', {
+    include_archived: showArchived ? 'true' : undefined,
   });
-  const [subjectFormData, setSubjectFormData] = useState({
-    subject_name: '',
-    subject_code: '',
-    description: '',
-    grade_level: 'R-3',
-  });
-  const [topicFormData, setTopicFormData] = useState({
-    topic_name: '',
-    topic_code: '',
-    description: '',
-    learning_objectives: '',
-  });
-  const [editFormData, setEditFormData] = useState({});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [openSubjects, setOpenSubjects] = useState(() => new Set());
+  const [modal, setModal] = useState(null); // { kind, item?, parent? }
+  const [confirm, setConfirm] = useState(null); // { action: 'archive' | 'restore' | 'delete', kind, item }
+  const mutate = useMutation();
 
-  const [includeInactive, setIncludeInactive] = useState(false);
+  const curricula = useMemo(() => data?.curricula ?? [], [data]);
+  const selected =
+    curricula.find((c) => c.curriculum_id === searchParams.get('curriculum')) ?? curricula[0] ?? null;
 
-  useEffect(() => {
-    fetchCurricula();
-  }, [includeInactive]);
+  // Subjects grouped by grade, in grade order (the API already sorts them).
+  const grades = useMemo(() => {
+    const groups = new Map();
+    for (const subject of selected?.subjects ?? []) {
+      if (!groups.has(subject.grade_level)) groups.set(subject.grade_level, []);
+      groups.get(subject.grade_level).push(subject);
+    }
+    return [...groups.entries()];
+  }, [selected]);
 
-  const fetchCurricula = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/super-admin/curricula?include_inactive=${includeInactive}`);
-      setCurricula(response.data.data.curricula || []);
-    } catch {
-      toast.error('Failed to fetch curricula');
-    } finally {
-      setLoading(false);
+  const select = (curriculumId) => {
+    setSearchParams({ curriculum: curriculumId }, { replace: true });
+    // On narrow screens the detail panel sits below the list; bring it into view.
+    if (window.matchMedia?.('(max-width: 991.98px)').matches) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      requestAnimationFrame(() =>
+        document
+          .getElementById('curriculum-title')
+          ?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+      );
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post('/api/super-admin/curricula', formData);
-      toast.success('Curriculum created successfully');
-      setShowModal(false);
-      fetchCurricula();
-      resetForm();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create curriculum');
-    }
-  };
-
-  const handleSubjectSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`/api/super-admin/curricula/${selectedCurriculum}/subjects`, subjectFormData);
-      toast.success('Subject added successfully');
-      setShowSubjectModal(false);
-      fetchCurricula();
-      resetSubjectForm();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to add subject');
-    }
-  };
-
-  const handleTopicSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`/api/super-admin/subjects/${selectedSubject}/topics`, topicFormData);
-      toast.success('Topic added successfully');
-      setShowTopicModal(false);
-      fetchCurricula();
-      resetTopicForm();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to add topic');
-    }
-  };
-
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      let endpoint = '';
-      
-      switch (selectedItemType) {
-        case 'curriculum':
-          endpoint = `/api/super-admin/curricula/${selectedItem}`;
-          break;
-        case 'subject':
-          endpoint = `/api/super-admin/subjects/${selectedItem}`;
-          break;
-        case 'topic':
-          endpoint = `/api/super-admin/topics/${selectedItem}`;
-          break;
-        default:
-          return;
-      }
-      
-      await axios.put(endpoint, editFormData);
-      toast.success(`${selectedItemType.charAt(0).toUpperCase() + selectedItemType.slice(1)} updated successfully`);
-      setShowEditModal(false);
-      fetchCurricula();
-      resetEditForm();
-    } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to update ${selectedItemType}`);
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      let endpoint = '';
-      
-      switch (selectedItemType) {
-        case 'curriculum':
-          endpoint = `/api/super-admin/curricula/${selectedItem}`;
-          break;
-        case 'subject':
-          endpoint = `/api/super-admin/subjects/${selectedItem}`;
-          break;
-        case 'topic':
-          endpoint = `/api/super-admin/topics/${selectedItem}`;
-          break;
-        default:
-          return;
-      }
-      
-      await axios.delete(endpoint);
-      toast.success(`${selectedItemType.charAt(0).toUpperCase() + selectedItemType.slice(1)} deleted successfully`);
-      setShowDeleteModal(false);
-      fetchCurricula();
-      resetSelection();
-    } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to delete ${selectedItemType}`);
-    }
-  };
-
-  const handleToggleActive = async (id, type, currentStatus) => {
-    try {
-      let endpoint = '';
-      switch (type) {
-        case 'curriculum': endpoint = `/api/super-admin/curricula/${id}`; break;
-        case 'subject': endpoint = `/api/super-admin/subjects/${id}`; break;
-        case 'topic': endpoint = `/api/super-admin/topics/${id}`; break;
-        default: return;
-      }
-      
-      await axios.put(endpoint, { is_active: !currentStatus });
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} ${!currentStatus ? 'reactivated' : 'deactivated'} successfully`);
-      fetchCurricula();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update status');
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      curriculum_name: '',
-      description: '',
+  const toggleSubject = (subjectId) =>
+    setOpenSubjects((current) => {
+      const next = new Set(current);
+      if (next.has(subjectId)) next.delete(subjectId);
+      else next.add(subjectId);
+      return next;
     });
+
+  const afterSave = (message) => {
+    setModal(null);
+    toast.success(message);
+    reload();
   };
 
-  const resetSubjectForm = () => {
-    setSubjectFormData({
-      subject_name: '',
-      subject_code: '',
-      description: '',
-      grade_level: 'R-3',
-    });
-    setSelectedCurriculum(null);
+  const runConfirm = async () => {
+    const { action, kind, item } = confirm;
+    const url = `/api/super-admin/${PATH[kind]}/${item[ID[kind]]}`;
+    const result =
+      action === 'delete'
+        ? await mutate.run('delete', url)
+        : await mutate.run('patch', `${url}/status`, { is_active: action === 'restore' });
+    if (result.ok) {
+      toast.success(result.message);
+      reload();
+    }
+    return result;
   };
 
-  const resetTopicForm = () => {
-    setTopicFormData({
-      topic_name: '',
-      topic_code: '',
-      description: '',
-      learning_objectives: '',
-    });
-    setSelectedSubject(null);
-  };
+  const itemActions = (kind, item) => [
+    { label: 'Edit', icon: LuPencil, onClick: () => setModal({ kind, item }) },
+    item.is_active
+      ? { label: 'Archive', icon: LuArchive, onClick: () => setConfirm({ action: 'archive', kind, item }) }
+      : { label: 'Restore', icon: LuArchiveRestore, onClick: () => setConfirm({ action: 'restore', kind, item }) },
+    null,
+    { label: 'Delete', icon: LuTrash2, danger: true, onClick: () => setConfirm({ action: 'delete', kind, item }) },
+  ];
 
-  const resetEditForm = () => {
-    setEditFormData({});
-    setSelectedItem(null);
-    setSelectedItemType(null);
-  };
-
-  const resetSelection = () => {
-    setSelectedItem(null);
-    setSelectedItemType(null);
-  };
-
-  const handleEditClick = (item, type, data) => {
-    setSelectedItem(item);
-    setSelectedItemType(type);
-    setEditFormData(data);
-    setShowEditModal(true);
-  };
-
-  const handleDeleteClick = (item, type) => {
-    setSelectedItem(item);
-    setSelectedItemType(type);
-    setShowDeleteModal(true);
-  };
-
-  const filteredCurricula = curricula.filter(curriculum =>
-    curriculum.curriculum_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    curriculum.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  if (loading && !data) return <FullPageLoader label="Loading curricula…" />;
 
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h1 className="h3 mb-2">Curricula Management</h1>
-          <p className="text-muted">Define and manage available curricula, subjects, and topics</p>
-        </div>
-        <Button variant="primary" onClick={() => setShowModal(true)}>
-          <i className="bi bi-plus-circle me-2"></i>
-          Add Curriculum
-        </Button>
-      </div>
+    <>
+      <PageHeader
+        title="Curricula"
+        description="The curricula, subjects and topics that schools teach and teachers assess against."
+        actions={
+          <Button onClick={() => setModal({ kind: 'curriculum' })} className="d-inline-flex align-items-center gap-2">
+            <LuPlus aria-hidden="true" /> Add curriculum
+          </Button>
+        }
+      />
 
-      {/* Statistics */}
-      <Row className="g-3 mb-4">
-        <Col xs={12} md={6} lg={3}>
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 className="text-muted mb-2">Total Curricula</h6>
-                  <h2 className="fw-bold mb-0">{curricula.length}</h2>
-                </div>
-                <div className="bg-primary-subtle p-3 rounded">
-                  <i className="bi bi-book fs-4 text-primary"></i>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} md={6} lg={3}>
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 className="text-muted mb-2">Total Subjects</h6>
-                  <h2 className="fw-bold mb-0">
-                    {curricula.reduce((total, curr) => total + (curr.subjects?.length || 0), 0)}
-                  </h2>
-                </div>
-                <div className="bg-success-subtle p-3 rounded">
-                  <i className="bi bi-journal-text fs-4 text-success"></i>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} md={6} lg={3}>
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 className="text-muted mb-2">Total Topics</h6>
-                  <h2 className="fw-bold mb-0">
-                    {curricula.reduce((total, curr) => 
-                      total + (curr.subjects?.reduce((subTotal, sub) => 
-                        subTotal + (sub.topics?.length || 0), 0) || 0), 0)}
-                  </h2>
-                </div>
-                <div className="bg-info-subtle p-3 rounded">
-                  <i className="bi bi-file-text fs-4 text-info"></i>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} md={6} lg={3}>
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 className="text-muted mb-2">Active Curricula</h6>
-                  <h2 className="fw-bold mb-0">
-                    {curricula.filter(c => c.is_active).length}
-                  </h2>
-                </div>
-                <div className="bg-warning-subtle p-3 rounded">
-                  <i className="bi bi-check-circle fs-4 text-warning"></i>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      <Card className="border-0 shadow-sm mb-4">
-        <Card.Body>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div className="flex-grow-1 me-3">
-              <InputGroup>
-                <InputGroup.Text>
-                  <i className="bi bi-search"></i>
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search curricula..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
+      {error && !data ? (
+        <EmptyState icon={LuBookOpen} title="Couldn’t load curricula" action={<Button onClick={reload}>Try again</Button>}>
+          {error}
+        </EmptyState>
+      ) : (
+        <div className="el-curricula">
+          <aside className="el-panel el-curricula__list" aria-label="Curricula">
+            <div className="el-panel__header">
+              <h2 className="el-panel__title">{plural(curricula.length, 'curriculum', 'curricula')}</h2>
+              <Form.Check
+                type="switch"
+                id="show-archived"
+                label="Show archived"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                className="small mb-0"
+              />
             </div>
-            <Form.Check 
-              type="switch"
-              id="show-inactive-switch"
-              label="Show Inactive"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-              className="text-nowrap"
-            />
-          </div>
-
-          {loading ? (
-            <div className="text-center py-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-            </div>
-          ) : filteredCurricula.length === 0 ? (
-            <div className="text-center py-5">
-              <i className="bi bi-book display-1 text-muted mb-3"></i>
-              <h4>No Curricula Found</h4>
-              <p className="text-muted">Create your first curriculum to get started.</p>
-              <Button variant="primary" onClick={() => setShowModal(true)}>
-                Create Curriculum
-              </Button>
-            </div>
-          ) : (
-            <Accordion>
-              {filteredCurricula.map((curriculum, index) => (
-                <Accordion.Item key={curriculum.curriculum_id} eventKey={index.toString()}>
-                  <Accordion.Header>
-                    <div className="d-flex align-items-center w-100">
-                      <div className="me-3">
-                        <i className="bi bi-book text-primary"></i>
-                      </div>
-                      <div className="flex-grow-1">
-                        <strong>{curriculum.curriculum_name}</strong>
-                        <div className="text-muted small">{curriculum.description}</div>
-                      </div>
-                      <Badge bg="success" className="me-2">
-                        {curriculum.subjects?.length || 0} Subjects
-                      </Badge>
-                      <Badge bg={curriculum.is_active ? 'success' : 'secondary'}>
-                        {curriculum.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                  </Accordion.Header>
-                  <Accordion.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6 className="mb-0">Subjects</h6>
-                      <Button 
-                        size="sm" 
-                        variant="outline-primary"
-                        onClick={() => {
-                          setSelectedCurriculum(curriculum.curriculum_id);
-                          setShowSubjectModal(true);
-                        }}
-                      >
-                        <i className="bi bi-plus me-1"></i>
-                        Add Subject
-                      </Button>
-                    </div>
-                    
-                    {curriculum.subjects && curriculum.subjects.length > 0 ? (
-                      <div className="ms-4">
-                        {curriculum.subjects.map((subject) => (
-                          <div key={subject.subject_id} className="mb-3">
-                            <Card className="border">
-                              <Card.Body>
-                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                  <div>
-                                    <strong>{subject.subject_name}</strong>
-                                    <div className="text-muted small">
-                                      Code: {subject.subject_code} • Grade: {subject.grade_level}
-                                      {subject.description && (
-                                        <div>{subject.description}</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="d-flex gap-2">
-                                    {subject.is_active && (
-                                      <Button 
-                                        size="sm" 
-                                        variant="outline-success"
-                                        onClick={() => {
-                                          setSelectedSubject(subject.subject_id);
-                                          setShowTopicModal(true);
-                                        }}
-                                      >
-                                        <i className="bi bi-plus me-1"></i>
-                                        Add Topic
-                                      </Button>
-                                    )}
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline-warning"
-                                      onClick={() => handleEditClick(
-                                        subject.subject_id, 
-                                        'subject',
-                                        {
-                                          subject_name: subject.subject_name,
-                                          subject_code: subject.subject_code,
-                                          description: subject.description,
-                                          grade_level: subject.grade_level
-                                        }
-                                      )}
-                                    >
-                                      <i className="bi bi-pencil"></i>
-                                    </Button>
-                                    {subject.is_active ? (
-                                      <Button 
-                                        size="sm" 
-                                        variant="outline-danger"
-                                        onClick={() => handleDeleteClick(
-                                          subject.subject_id, 
-                                          'subject',
-                                          subject.subject_name
-                                        )}
-                                      >
-                                        <i className="bi bi-trash"></i>
-                                      </Button>
-                                    ) : (
-                                      <Button 
-                                        size="sm" 
-                                        variant="outline-success"
-                                        onClick={() => handleToggleActive(subject.subject_id, 'subject', false)}
-                                      >
-                                        <i className="bi bi-arrow-counterclockwise"></i>
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {subject.topics && subject.topics.length > 0 && (
-                                  <div className="ms-3">
-                                    <h6 className="small text-muted mb-2">Topics:</h6>
-                                    <Row className="g-2">
-                                      {subject.topics.map((topic) => (
-                                        <Col key={topic.topic_id} xs={12} md={6} lg={4}>
-                                          <Card className={`border ${topic.is_active ? 'bg-light' : 'bg-secondary-subtle'}`}>
-                                            <Card.Body className="p-3">
-                                              <div className="d-flex justify-content-between align-items-start">
-                                                <div>
-                                                  <strong className={`small ${!topic.is_active ? 'text-muted text-decoration-line-through' : ''}`}>
-                                                    {topic.topic_name}
-                                                  </strong>
-                                                  <div className="text-muted extra-small">
-                                                    {topic.topic_code}
-                                                  </div>
-                                                </div>
-                                                <div className="d-flex gap-1">
-                                                  <Button 
-                                                    size="sm" 
-                                                    variant="outline-warning"
-                                                    className="p-1"
-                                                    onClick={() => handleEditClick(
-                                                      topic.topic_id, 
-                                                      'topic',
-                                                      {
-                                                        topic_name: topic.topic_name,
-                                                        topic_code: topic.topic_code,
-                                                        description: topic.description,
-                                                        learning_objectives: topic.learning_objectives
-                                                      }
-                                                    )}
-                                                  >
-                                                    <i className="bi bi-pencil"></i>
-                                                  </Button>
-                                                  {topic.is_active ? (
-                                                    <Button 
-                                                      size="sm" 
-                                                      variant="outline-danger"
-                                                      className="p-1"
-                                                      onClick={() => handleDeleteClick(
-                                                        topic.topic_id, 
-                                                        'topic',
-                                                        topic.topic_name
-                                                      )}
-                                                    >
-                                                      <i className="bi bi-trash"></i>
-                                                    </Button>
-                                                  ) : (
-                                                    <Button 
-                                                      size="sm" 
-                                                      variant="outline-success"
-                                                      className="p-1"
-                                                      onClick={() => handleToggleActive(topic.topic_id, 'topic', false)}
-                                                    >
-                                                      <i className="bi bi-arrow-counterclockwise"></i>
-                                                    </Button>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </Card.Body>
-                                          </Card>
-                                        </Col>
-                                      ))}
-                                    </Row>
-                                  </div>
-                                )}
-                              </Card.Body>
-                            </Card>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-3">
-                        <p className="text-muted">No subjects added yet.</p>
-                      </div>
-                    )}
-                    
-                    <div className="d-flex gap-2 mt-3">
-                      <Button 
-                        size="sm" 
-                        variant="outline-warning"
-                        onClick={() => handleEditClick(
-                          curriculum.curriculum_id, 
-                          'curriculum',
-                          {
-                            curriculum_name: curriculum.curriculum_name,
-                            description: curriculum.description
-                          }
-                        )}
-                      >
-                        <i className="bi bi-pencil me-1"></i>
-                        Edit Curriculum
-                      </Button>
-                      {curriculum.is_active ? (
-                        <Button 
-                          size="sm" 
-                          variant="outline-danger"
-                          onClick={() => handleDeleteClick(
-                            curriculum.curriculum_id, 
-                            'curriculum',
-                            curriculum.curriculum_name
-                          )}
-                        >
-                          <i className="bi bi-trash me-1"></i>
-                          Delete Curriculum
-                        </Button>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          variant="outline-success"
-                          onClick={() => handleToggleActive(curriculum.curriculum_id, 'curriculum', false)}
-                        >
-                          <i className="bi bi-arrow-counterclockwise me-1"></i>
-                          Reactivate Curriculum
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline-secondary">
-                        <i className="bi bi-eye me-1"></i>
-                        View Details
-                      </Button>
-                    </div>
-                  </Accordion.Body>
-                </Accordion.Item>
-              ))}
-            </Accordion>
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Add Curriculum Modal */}
-      <Modal show={showModal} onHide={() => { setShowModal(false); resetForm(); }}>
-        <Form onSubmit={handleSubmit}>
-          <Modal.Header closeButton>
-            <Modal.Title>Add New Curriculum</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Curriculum Name *</Form.Label>
-              <Form.Control
-                type="text"
-                value={formData.curriculum_name}
-                onChange={(e) => setFormData({...formData, curriculum_name: e.target.value})}
-                placeholder="e.g., CAPS, Cambridge"
-                required
-              />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                placeholder="Enter curriculum description..."
-              />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowModal(false); resetForm(); }}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit">
-              Create Curriculum
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-
-      {/* Add Subject Modal */}
-      <Modal show={showSubjectModal} onHide={() => { setShowSubjectModal(false); resetSubjectForm(); }}>
-        <Form onSubmit={handleSubjectSubmit}>
-          <Modal.Header closeButton>
-            <Modal.Title>Add Subject to Curriculum</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Subject Name *</Form.Label>
-              <Form.Control
-                type="text"
-                value={subjectFormData.subject_name}
-                onChange={(e) => setSubjectFormData({...subjectFormData, subject_name: e.target.value})}
-                placeholder="e.g., Mathematics, English Home Language"
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Subject Code</Form.Label>
-              <Form.Control
-                type="text"
-                value={subjectFormData.subject_code}
-                onChange={(e) => setSubjectFormData({...subjectFormData, subject_code: e.target.value})}
-                placeholder="e.g., MATH, ENG-HL"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Grade Level</Form.Label>
-              <Form.Select
-                value={subjectFormData.grade_level}
-                onChange={(e) => setSubjectFormData({...subjectFormData, grade_level: e.target.value})}
-              >
-                <option value="R-3">Grade R-3</option>
-                <option value="R">Grade R Only</option>
-                <option value="1">Grade 1 Only</option>
-                <option value="2">Grade 2 Only</option>
-                <option value="3">Grade 3 Only</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={subjectFormData.description}
-                onChange={(e) => setSubjectFormData({...subjectFormData, description: e.target.value})}
-                placeholder="Enter subject description..."
-              />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowSubjectModal(false); resetSubjectForm(); }}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit">
-              Add Subject
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-
-      {/* Add Topic Modal */}
-      <Modal show={showTopicModal} onHide={() => { setShowTopicModal(false); resetTopicForm(); }}>
-        <Form onSubmit={handleTopicSubmit}>
-          <Modal.Header closeButton>
-            <Modal.Title>Add Topic to Subject</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Topic Name *</Form.Label>
-              <Form.Control
-                type="text"
-                value={topicFormData.topic_name}
-                onChange={(e) => setTopicFormData({...topicFormData, topic_name: e.target.value})}
-                placeholder="e.g., Addition, Phonemic Awareness"
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Topic Code</Form.Label>
-              <Form.Control
-                type="text"
-                value={topicFormData.topic_code}
-                onChange={(e) => setTopicFormData({...topicFormData, topic_code: e.target.value})}
-                placeholder="e.g., ADD-101, PHON-201"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Learning Objectives</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={topicFormData.learning_objectives}
-                onChange={(e) => setTopicFormData({...topicFormData, learning_objectives: e.target.value})}
-                placeholder="Enter learning objectives..."
-              />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={topicFormData.description}
-                onChange={(e) => setTopicFormData({...topicFormData, description: e.target.value})}
-                placeholder="Enter topic description..."
-              />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowTopicModal(false); resetTopicForm(); }}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit">
-              Add Topic
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-
-      {/* Edit Modal */}
-      <Modal show={showEditModal} onHide={() => { setShowEditModal(false); resetEditForm(); }}>
-        <Form onSubmit={handleEditSubmit}>
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit {selectedItemType ? selectedItemType.charAt(0).toUpperCase() + selectedItemType.slice(1) : ''}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {selectedItemType === 'curriculum' && (
-              <>
-                <Form.Group className="mb-3">
-                  <Form.Label>Curriculum Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={editFormData.curriculum_name || ''}
-                    onChange={(e) => setEditFormData({...editFormData, curriculum_name: e.target.value})}
-                    required
-                  />
-                </Form.Group>
-                <Form.Group>
-                  <Form.Label>Description</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={3}
-                    value={editFormData.description || ''}
-                    onChange={(e) => setEditFormData({...editFormData, description: e.target.value})}
-                  />
-                </Form.Group>
-              </>
+            {curricula.length === 0 ? (
+              <EmptyState compact icon={LuBookOpen} title="No curricula yet">
+                Start with the curriculum your schools follow, such as CAPS.
+              </EmptyState>
+            ) : (
+              <ul className="el-list el-curricula__items">
+                {curricula.map((c) => (
+                  <li key={c.curriculum_id}>
+                    <button
+                      type="button"
+                      className={`el-curricula__item ${selected?.curriculum_id === c.curriculum_id ? 'is-selected' : ''}`}
+                      onClick={() => select(c.curriculum_id)}
+                      aria-current={selected?.curriculum_id === c.curriculum_id ? 'true' : undefined}
+                    >
+                      <span className="d-flex align-items-center justify-content-between gap-2">
+                        <span className="el-cell-primary">{c.curriculum_name}</span>
+                        {!c.is_active && <StatusBadge status="archived" />}
+                      </span>
+                      <span className="el-cell-secondary">
+                        {plural(c.subjects.length, 'subject')} · {plural(topicCount(c), 'topic')} ·{' '}
+                        {plural(c.school_assignment_count, 'school')}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
-            
-            {selectedItemType === 'subject' && (
-              <>
-                <Form.Group className="mb-3">
-                  <Form.Label>Subject Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={editFormData.subject_name || ''}
-                    onChange={(e) => setEditFormData({...editFormData, subject_name: e.target.value})}
-                    required
-                  />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                  <Form.Label>Subject Code</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={editFormData.subject_code || ''}
-                    onChange={(e) => setEditFormData({...editFormData, subject_code: e.target.value})}
-                  />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                  <Form.Label>Grade Level</Form.Label>
-                  <Form.Select
-                    value={editFormData.grade_level || 'R-3'}
-                    onChange={(e) => setEditFormData({...editFormData, grade_level: e.target.value})}
+          </aside>
+
+          {selected && (
+            <section className="el-panel" aria-labelledby="curriculum-title">
+              <div className="el-panel__header">
+                <div className="min-w-0">
+                  <h2 id="curriculum-title" className="h5 mb-1 d-flex align-items-center gap-2 flex-wrap">
+                    {selected.curriculum_name}
+                    {!selected.is_active && <StatusBadge status="archived" />}
+                  </h2>
+                  <p className="el-panel__subtitle mb-0">
+                    {selected.description || 'No description.'}
+                  </p>
+                </div>
+                <div className="d-flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      setModal({ kind: 'subject', parent: { id: selected.curriculum_id, name: selected.curriculum_name } })
+                    }
+                    className="d-inline-flex align-items-center gap-2"
                   >
-                    <option value="R-3">Grade R-3</option>
-                    <option value="R">Grade R Only</option>
-                    <option value="1">Grade 1 Only</option>
-                    <option value="2">Grade 2 Only</option>
-                    <option value="3">Grade 3 Only</option>
-                  </Form.Select>
-                </Form.Group>
-                <Form.Group>
-                  <Form.Label>Description</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={2}
-                    value={editFormData.description || ''}
-                    onChange={(e) => setEditFormData({...editFormData, description: e.target.value})}
-                  />
-                </Form.Group>
-              </>
-            )}
-            
-            {selectedItemType === 'topic' && (
-              <>
-                <Form.Group className="mb-3">
-                  <Form.Label>Topic Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={editFormData.topic_name || ''}
-                    onChange={(e) => setEditFormData({...editFormData, topic_name: e.target.value})}
-                    required
-                  />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                  <Form.Label>Topic Code</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={editFormData.topic_code || ''}
-                    onChange={(e) => setEditFormData({...editFormData, topic_code: e.target.value})}
-                  />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                  <Form.Label>Learning Objectives</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={2}
-                    value={editFormData.learning_objectives || ''}
-                    onChange={(e) => setEditFormData({...editFormData, learning_objectives: e.target.value})}
-                  />
-                </Form.Group>
-                <Form.Group>
-                  <Form.Label>Description</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={2}
-                    value={editFormData.description || ''}
-                    onChange={(e) => setEditFormData({...editFormData, description: e.target.value})}
-                  />
-                </Form.Group>
-              </>
-            )}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowEditModal(false); resetEditForm(); }}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit">
-              Update
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+                    <LuPlus aria-hidden="true" /> Subject
+                  </Button>
+                  <RowActions label={`Actions for ${selected.curriculum_name}`} items={itemActions('curriculum', selected)} />
+                </div>
+              </div>
 
-      {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => { setShowDeleteModal(false); resetSelection(); }}>
-        <Modal.Header closeButton>
-          <Modal.Title>Confirm Delete</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Alert variant="warning">
-            <i className="bi bi-exclamation-triangle me-2"></i>
-            Are you sure you want to delete this {selectedItemType}? This action cannot be undone.
-          </Alert>
-          <p className="text-muted">
-            Note: This will only soft delete the item (set to inactive). It will not be removed from the database.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => { setShowDeleteModal(false); resetSelection(); }}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleDelete}>
-            Delete
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </div>
+              {grades.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={LuLayers}
+                  title="No subjects yet"
+                  action={
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        setModal({ kind: 'subject', parent: { id: selected.curriculum_id, name: selected.curriculum_name } })
+                      }
+                    >
+                      Add a subject
+                    </Button>
+                  }
+                >
+                  Add subjects per grade, then the topics within each subject.
+                </EmptyState>
+              ) : (
+                grades.map(([grade, subjects]) => (
+                  <div key={grade} className="el-grade-group">
+                    <h3 className="el-grade-group__title">{gradeLabel(grade)}</h3>
+                    <ul className="el-list">
+                      {subjects.map((subject) => {
+                        const open = openSubjects.has(subject.subject_id);
+                        return (
+                          <li key={subject.subject_id} className="el-subject">
+                            <div className="el-subject__row">
+                              <button
+                                type="button"
+                                className="el-subject__toggle"
+                                onClick={() => toggleSubject(subject.subject_id)}
+                                aria-expanded={open}
+                                aria-controls={`topics-${subject.subject_id}`}
+                              >
+                                <LuChevronRight
+                                  className={`el-subject__chevron ${open ? 'is-open' : ''}`}
+                                  aria-hidden="true"
+                                />
+                                <span>
+                                  <span className="el-cell-primary">{subject.subject_name}</span>
+                                  {subject.subject_code && (
+                                    <span className="el-cell-secondary font-monospace ms-2">{subject.subject_code}</span>
+                                  )}
+                                  <span className="el-cell-secondary d-block">{plural(subject.topics.length, 'topic')}</span>
+                                </span>
+                              </button>
+                              <div className="d-flex align-items-center gap-2">
+                                {!subject.is_active && <StatusBadge status="archived" />}
+                                <RowActions
+                                  label={`Actions for ${subject.subject_name}`}
+                                  items={itemActions('subject', subject)}
+                                />
+                              </div>
+                            </div>
+                            <AnimatePresence initial={false}>
+                              {open && (
+                                <motion.div {...reveal} className="overflow-hidden" id={`topics-${subject.subject_id}`}>
+                                  <ul className="el-topics">
+                                    {subject.topics.map((topic) => (
+                                      <li key={topic.topic_id}>
+                                        <div className="min-w-0">
+                                          <div className="fw-semibold">
+                                            {topic.topic_name}
+                                            {!topic.is_active && (
+                                              <span className="ms-2">
+                                                <StatusBadge status="archived" />
+                                              </span>
+                                            )}
+                                          </div>
+                                          {topic.learning_objectives && (
+                                            <div className="el-cell-secondary">{topic.learning_objectives}</div>
+                                          )}
+                                        </div>
+                                        <RowActions label={`Actions for ${topic.topic_name}`} items={itemActions('topic', topic)} />
+                                      </li>
+                                    ))}
+                                    <li>
+                                      <Button
+                                        size="sm"
+                                        variant="link"
+                                        className="px-0 d-inline-flex align-items-center gap-1"
+                                        onClick={() =>
+                                          setModal({
+                                            kind: 'topic',
+                                            parent: { id: subject.subject_id, name: subject.subject_name },
+                                          })
+                                        }
+                                      >
+                                        <LuPlus aria-hidden="true" /> Add topic
+                                      </Button>
+                                    </li>
+                                  </ul>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </section>
+          )}
+        </div>
+      )}
+
+      {modal && <CurriculumItemModal mode={modal} onClose={() => setModal(null)} onSaved={afterSave} />}
+
+      <ConfirmDialog
+        show={Boolean(confirm)}
+        title={
+          confirm &&
+          `${{ archive: 'Archive', restore: 'Restore', delete: 'Delete' }[confirm.action]} ${confirm.item[NAME[confirm.kind]]}?`
+        }
+        confirmLabel={confirm && { archive: 'Archive', restore: 'Restore', delete: 'Delete permanently' }[confirm.action]}
+        variant={confirm?.action === 'restore' ? 'primary' : 'danger'}
+        onConfirm={runConfirm}
+        onClose={() => setConfirm(null)}
+      >
+        {confirm?.action === 'archive' &&
+          'Archived items are hidden from teachers when they create new assessments and worksheets. Existing records keep working, and you can restore it at any time.'}
+        {confirm?.action === 'restore' && 'It becomes available to teachers again.'}
+        {confirm?.action === 'delete' &&
+          `This permanently removes it${confirm.kind !== 'topic' ? ' and everything inside it' : ''}. Anything already used by assessments or worksheets can only be archived.`}
+      </ConfirmDialog>
+    </>
   );
 };
 

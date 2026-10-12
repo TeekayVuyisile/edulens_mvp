@@ -1,261 +1,129 @@
-import React from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
-import { Toaster } from "react-hot-toast";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap-icons/font/bootstrap-icons.css";
-import "./styles/global.css";
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
+import { Toaster } from 'react-hot-toast';
 
-// Contexts
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute, { PublicOnlyRoute } from './components/common/ProtectedRoute';
+import AppShell from './components/layout/AppShell';
+import FullPageLoader from './components/ui/FullPageLoader';
 
-// Components
-import Layout from "./components/common/Layout";
-import ProtectedRoute from "./components/common/ProtectedRoute";
+import Login from './pages/auth/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
+import { NotFound, Unauthorized } from './pages/StatusPage';
 
-// Pages
-import Login from "./pages/auth/Login";
-import ForgotPassword from "./pages/auth/ForgotPassword";
-import ResetPassword from "./pages/auth/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import Profile from "./pages/Profile";
+// Signed-in pages load on demand, so each role only downloads its own screens.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Profile = lazy(() => import('./pages/Profile'));
 
-// Super Admin Pages
-import Schools from "./pages/super-admin/Schools";
-import Curricula from "./pages/super-admin/Curricula";
-import Users from "./pages/super-admin/Users";
+const Schools = lazy(() => import('./pages/super-admin/Schools'));
+const SchoolDetail = lazy(() => import('./pages/super-admin/SchoolDetail'));
+const Curricula = lazy(() => import('./pages/super-admin/Curricula'));
+const Users = lazy(() => import('./pages/super-admin/Users'));
 
-// School Admin Pages
-import Teachers from "./pages/school-admin/Teachers";
-import Learners from "./pages/school-admin/Learners";
-import Classes from "./pages/school-admin/Classes";
-import Reports from "./pages/school-admin/Reports";
+const SchoolClasses = lazy(() => import('./pages/school-admin/Classes'));
+const Teachers = lazy(() => import('./pages/school-admin/Teachers'));
+const Learners = lazy(() => import('./pages/school-admin/Learners'));
+const LearnerDetail = lazy(() => import('./pages/school-admin/LearnerDetail'));
+const SchoolClassDetail = lazy(() => import('./pages/school-admin/ClassDetail'));
+const Reports = lazy(() => import('./pages/school-admin/Reports'));
+const YearEnd = lazy(() => import('./pages/school-admin/YearEnd'));
 
-// Teacher Pages
-import TeacherClasses from "./pages/teacher/Classes";
-import ClassDetails from "./pages/teacher/ClassDetails";
-import AddLearners from "./pages/teacher/AddLearners";
-import Assessments from "./pages/teacher/Assessments";
-import AssessmentGradebook from "./pages/teacher/AssessmentGradebook"
-import Worksheets from "./pages/teacher/Worksheets";
-import Grading from "./pages/teacher/Grading";
+const TeacherClasses = lazy(() => import('./pages/teacher/Classes'));
+const TeacherClassDetail = lazy(() => import('./pages/teacher/ClassDetail'));
+const LearnerProfile = lazy(() => import('./pages/teacher/LearnerProfile'));
+const Assessments = lazy(() => import('./pages/teacher/Assessments'));
+const AssessmentDetail = lazy(() => import('./pages/teacher/AssessmentDetail'));
+const Worksheets = lazy(() => import('./pages/teacher/Worksheets'));
+const WorksheetCreate = lazy(() => import('./pages/teacher/WorksheetCreate'));
+const WorksheetDetail = lazy(() => import('./pages/teacher/WorksheetDetail'));
+
+const ChildProgress = lazy(() => import('./pages/parent/ChildProgress'));
+
+const page = (Component) => (
+  <Suspense fallback={<FullPageLoader label="Loading page…" />}>
+    <Component />
+  </Suspense>
+);
+
+/** The route table; exported so tests can mount it inside a MemoryRouter. */
+export const AppRoutes = () => (
+  <Routes>
+    <Route element={<PublicOnlyRoute />}>
+      <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+    </Route>
+    {/* Reachable signed in or out: the link arrives by email. */}
+    <Route path="/reset-password" element={<ResetPassword />} />
+
+    <Route element={<ProtectedRoute />}>
+      <Route element={<AppShell />}>
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={page(Dashboard)} />
+        <Route path="profile" element={page(Profile)} />
+        <Route path="unauthorized" element={<Unauthorized />} />
+
+        <Route path="super-admin" element={<ProtectedRoute allowedRoles={['super_admin']} />}>
+          <Route path="schools" element={page(Schools)} />
+          <Route path="schools/:schoolId" element={page(SchoolDetail)} />
+          <Route path="curricula" element={page(Curricula)} />
+          <Route path="users" element={page(Users)} />
+        </Route>
+
+        <Route path="school-admin" element={<ProtectedRoute allowedRoles={['school_admin']} />}>
+          <Route path="classes" element={page(SchoolClasses)} />
+          <Route path="classes/:classId" element={page(SchoolClassDetail)} />
+          <Route path="teachers" element={page(Teachers)} />
+          <Route path="learners" element={page(Learners)} />
+          <Route path="learners/:learnerId" element={page(LearnerDetail)} />
+          <Route path="reports" element={page(Reports)} />
+          <Route path="year-end" element={page(YearEnd)} />
+        </Route>
+
+        <Route path="parent" element={<ProtectedRoute allowedRoles={['parent']} />}>
+          <Route path="children/:learnerId" element={page(ChildProgress)} />
+        </Route>
+
+        <Route path="teacher" element={<ProtectedRoute allowedRoles={['teacher']} />}>
+          <Route path="classes" element={page(TeacherClasses)} />
+          <Route path="classes/:classId" element={page(TeacherClassDetail)} />
+          <Route path="learners/:learnerId" element={page(LearnerProfile)} />
+          <Route path="assessments" element={page(Assessments)} />
+          <Route path="assessments/:assessmentId" element={page(AssessmentDetail)} />
+          {/* Old bookmark: grading is now the "To mark" filter. */}
+          <Route path="grading" element={<Navigate to="/teacher/assessments?status=to_mark" replace />} />
+          <Route path="worksheets" element={page(Worksheets)} />
+          <Route path="worksheets/new" element={page(WorksheetCreate)} />
+          <Route path="worksheets/:worksheetId" element={page(WorksheetDetail)} />
+        </Route>
+      </Route>
+    </Route>
+
+    <Route path="*" element={<NotFound />} />
+  </Routes>
+);
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              borderRadius: "10px",
-              background: "#333",
-              color: "#fff",
-            },
-          }}
-        />
-
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          {/* Protected Routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Navigate to="/dashboard" replace />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Profile />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          {/* Super Admin Routes */}
-          <Route
-            path="/super-admin/schools"
-            element={
-              <ProtectedRoute allowedRoles={["super_admin"]}>
-                <Layout>
-                  <Schools />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/super-admin/curricula"
-            element={
-              <ProtectedRoute allowedRoles={["super_admin"]}>
-                <Layout>
-                  <Curricula />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/super-admin/users"
-            element={
-              <ProtectedRoute allowedRoles={["super_admin"]}>
-                <Layout>
-                  <Users />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          {/* School Admin Routes */}
-          <Route
-            path="/school-admin/teachers"
-            element={
-              <ProtectedRoute allowedRoles={["school_admin"]}>
-                <Layout>
-                  <Teachers />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/school-admin/learners"
-            element={
-              <ProtectedRoute allowedRoles={["school_admin"]}>
-                <Layout>
-                  <Learners />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/school-admin/classes"
-            element={
-              <ProtectedRoute allowedRoles={["school_admin"]}>
-                <Layout>
-                  <Classes />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/school-admin/reports"
-            element={
-              <ProtectedRoute allowedRoles={["school_admin"]}>
-                <Layout>
-                  <Reports />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          {/* Teacher Routes */}
-          <Route
-            path="/teacher/classes"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <Layout>
-                  <TeacherClasses />
-                </Layout>
-              </ProtectedRoute>
-            }
+    <BrowserRouter>
+      {/* Respect the OS "reduce motion" setting for every framer-motion animation. */}
+      <MotionConfig reducedMotion="user">
+        <AuthProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              className: 'el-toast',
+              success: { iconTheme: { primary: '#15803d', secondary: '#fff' } },
+              error: { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
+            }}
           />
 
-          <Route
-            path="/teacher/classes/:classId"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <Layout>
-                  <ClassDetails />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher/classes/:classId/add-learners"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <Layout>
-                  <AddLearners />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher/assessments"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <Layout>
-                  <Assessments />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/teacher/assessments/:assessmentId/gradebook"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <Layout>
-                  <AssessmentGradebook />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher/worksheets"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <Layout>
-                  <Worksheets />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher/grading"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <Layout>
-                  <Grading />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          {/* 404 Route */}
-          <Route
-            path="*"
-            element={
-              <div className="min-vh-100 d-flex align-items-center justify-content-center">
-                <div className="text-center">
-                  <h1 className="display-1 text-muted">404</h1>
-                  <p className="lead">Page not found</p>
-                </div>
-              </div>
-            }
-          />
-        </Routes>
-      </AuthProvider>
-    </Router>
+          <AppRoutes />
+        </AuthProvider>
+      </MotionConfig>
+    </BrowserRouter>
   );
 }
 

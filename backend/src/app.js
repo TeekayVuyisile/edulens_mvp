@@ -2,11 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Import middleware
 import { activityLogger } from './middleware/activityLogger.js';
+import { HttpError, fromDatabaseError } from './utils/httpError.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -14,14 +13,10 @@ import superAdminRoutes from './routes/superAdminRoutes.js';
 import schoolAdminRoutes from './routes/schoolAdminRoutes.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import curriculumRoutes from './routes/curriculumRoutes.js';
-import learnerRoutes from './routes/learnerRoutes.js';
+import parentRoutes from './routes/parentRoutes.js';
 
 const app = express();
 const isTest = process.env.NODE_ENV === 'test';
-
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Rate limiting (disabled under test so suites can make many requests)
 const limiter = rateLimit({
@@ -68,9 +63,6 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
-
 // Activity logging middleware (writes to the DB after each response; skipped under test)
 if (!isTest) {
   app.use(activityLogger);
@@ -93,7 +85,7 @@ app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/school-admin', schoolAdminRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/curriculum', curriculumRoutes);
-app.use('/api/learner', learnerRoutes);
+app.use('/api/parent', parentRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -104,23 +96,35 @@ app.use((req, res) => {
   });
 });
 
-// Error handling middleware
+// Error handling middleware. Express 5 forwards errors thrown (or rejected)
+// in async handlers here, so handlers can simply `throw notFound(...)`.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error('Error:', {
+  // Malformed JSON bodies and oversized payloads come from body-parser.
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ status: 'error', message: 'Request body is not valid JSON' });
+  }
+
+  const known = err instanceof HttpError ? err : fromDatabaseError(err);
+  if (known) {
+    return res.status(known.statusCode).json({
+      status: 'error',
+      message: known.message,
+      ...known.details
+    });
+  }
+
+  console.error('Unhandled error:', {
     message: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method
   });
 
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal server error';
-
-  res.status(statusCode).json({
+  res.status(err.statusCode || err.status || 500).json({
     status: 'error',
-    message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: 'Something went wrong. Please try again.',
+    ...(process.env.NODE_ENV === 'development' && { detail: err.message, stack: err.stack })
   });
 });
 

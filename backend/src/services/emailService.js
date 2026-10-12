@@ -13,6 +13,51 @@ class EmailService {
     });
   }
 
+  /** True when SMTP settings are present. Tests and fresh installs run without email. */
+  get enabled() {
+    return Boolean(process.env.SMTP_HOST);
+  }
+
+  /** Every email goes through here, so nothing is sent unless SMTP is configured. */
+  async send(mailOptions) {
+    if (!this.enabled) {
+      throw new Error('Email is not configured (SMTP_HOST is empty)');
+    }
+    return this.transporter.sendMail(mailOptions);
+  }
+
+  /**
+   * Invitation or admin-issued reset link.
+   * kind: 'invite' (new account, 7 days) or 'reset' (existing account, 24 hours)
+   */
+  async sendAccountLinkEmail({ email, firstName, link, kind, roleLabel, schoolName }) {
+    const isInvite = kind === 'invite';
+    const heading = isInvite ? 'You’re invited to Edulens LMS' : 'Reset your Edulens password';
+    const intro = isInvite
+      ? `You’ve been added to Edulens LMS as <strong>${roleLabel}</strong>${schoolName ? ` at <strong>${schoolName}</strong>` : ''}. Choose a password to activate your account.`
+      : 'An administrator sent you a link to choose a new password.';
+
+    return this.send({
+      from: `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`,
+      to: email,
+      subject: isInvite ? 'Your Edulens LMS invitation' : 'Reset your Edulens LMS password',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4F46E5;">${heading}</h2>
+          <p>Hi ${firstName},</p>
+          <p>${intro}</p>
+          <a href="${link}"
+             style="display: inline-block; padding: 10px 20px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px;">
+            ${isInvite ? 'Set up my account' : 'Choose a new password'}
+          </a>
+          <p>This link expires in ${isInvite ? '7 days' : '24 hours'}.</p>
+          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+          <p style="color: #666; font-size: 12px;">Edulens LMS - Empowering Teachers, Inspiring Learners</p>
+        </div>
+      `
+    });
+  }
+
   async sendPasswordResetEmail(email, resetToken) {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
     
@@ -40,7 +85,7 @@ class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await this.send(mailOptions);
       return true;
     } catch (error) {
       console.error('Error sending password reset email:', error);
@@ -80,7 +125,7 @@ async sendPasswordChangedNotification(email, firstName, lastName, superAdminCont
   };
 
   try {
-    await this.transporter.sendMail(mailOptions);
+    await this.send(mailOptions);
     return true;
   } catch (error) {
     console.error('Error sending password change notification:', error);
@@ -111,7 +156,7 @@ async sendWelcomeEmail(email, firstName, role, passwordInfo) {
   };
 
   try {
-    await this.transporter.sendMail(mailOptions);
+    await this.send(mailOptions);
     return true;
   } catch (error) {
     console.error('Error sending welcome email:', error);

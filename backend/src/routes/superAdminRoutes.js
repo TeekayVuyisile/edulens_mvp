@@ -1,156 +1,155 @@
 import express from 'express';
+import { body, query } from 'express-validator';
 import { requireSuperAdmin } from '../middleware/authMiddleware.js';
-import * as superAdminController from '../controllers/superAdminController.js';
-import { validate } from '../middleware/validationMiddleware.js';
-import { body, param } from 'express-validator';
+import { validate, validateUuidParams } from '../middleware/validationMiddleware.js';
+import { GRADE_LEVELS } from '../models/Curriculum.js';
+import * as schools from '../controllers/superAdmin/schoolsController.js';
+import * as curricula from '../controllers/superAdmin/curriculaController.js';
+import * as users from '../controllers/superAdmin/usersController.js';
+import { getPlatformStatistics } from '../controllers/superAdmin/statisticsController.js';
 
 const router = express.Router();
 
-// Apply super admin middleware to all routes
+validateUuidParams(router, ['assignmentId', 'curriculumId', 'schoolId', 'subjectId', 'topicId', 'userId']);
+
 router.use(requireSuperAdmin);
 
-// School Management
-router.post('/schools',
-  validate([
-    body('school_name').notEmpty(),
-    body('contact_email').isEmail(),
-    body('contact_phone').optional().isMobilePhone()
-  ]),
-  superAdminController.createSchool
-);
+// ---- Shared rules ---------------------------------------------------------------
 
-router.get('/schools', superAdminController.getSchools);
-router.get('/schools/:schoolId', superAdminController.getSchoolById);
-router.put('/schools/:schoolId', superAdminController.updateSchool);
-router.delete('/schools/:schoolId', superAdminController.deleteSchool);
+export const PROVINCES = [
+  'Eastern Cape', 'Free State', 'Gauteng', 'KwaZulu-Natal', 'Limpopo',
+  'Mpumalanga', 'North West', 'Northern Cape', 'Western Cape',
+];
 
-router.post('/schools/:schoolId/admin',
-  validate([
-    param('schoolId').isUUID(),
-    body('email').isEmail(),
-    body('password').isLength({ min: 6 }),
-    body('first_name').notEmpty(),
-    body('last_name').notEmpty()
-  ]),
-  superAdminController.createSchoolAdmin
-);
+const requiredText = (field, label, max = 255) =>
+  body(field).isString().trim().notEmpty().withMessage(`${label} is required`)
+    .isLength({ max }).withMessage(`${label} is too long`);
 
-router.patch('/schools/:schoolId/toggle-active', superAdminController.toggleSchoolActivation);
+const optionalText = (field, max = 2000) =>
+  body(field).optional({ values: 'null' }).isString().trim().isLength({ max });
 
-// Curriculum Management
-router.post('/curricula',
-  validate([
-    body('curriculum_name').notEmpty(),
-    body('description').optional()
-  ]),
-  superAdminController.createCurriculum
-);
+const email = (field = 'email', { optional = false } = {}) => {
+  const chain = body(field);
+  return (optional ? chain.optional() : chain)
+    .trim().toLowerCase().isEmail().withMessage('Enter a valid email address');
+};
 
-router.get('/curricula', superAdminController.getCurricula);
-router.get('/curricula/:curriculumId', superAdminController.getCurriculumById);
-router.put('/curricula/:curriculumId', superAdminController.updateCurriculum);
-router.delete('/curricula/:curriculumId', superAdminController.deleteCurriculum);
+const phone = (field) =>
+  body(field).optional({ values: 'falsy' }).trim()
+    .matches(/^\+?[\d\s()-]{7,20}$/).withMessage('Enter a valid phone number');
 
-// Subject Management
-router.post('/curricula/:curriculumId/subjects',
-  validate([
-    param('curriculumId').isUUID(),
-    body('subject_name').notEmpty(),
-    body('grade_level').isIn(['R', '1', '2', '3', 'R-3'])
-  ]),
-  superAdminController.addSubject
-);
+const isActive = body('is_active').isBoolean({ strict: true }).withMessage('is_active must be true or false');
 
-router.put('/subjects/:subjectId',
-  validate([
-    param('subjectId').isUUID()
-  ]),
-  superAdminController.updateSubject
-);
+const gradeLevel = (field = 'grade_level', { optional = false } = {}) => {
+  const chain = body(field);
+  return (optional ? chain.optional() : chain)
+    .isIn(GRADE_LEVELS).withMessage(`Grade must be one of ${GRADE_LEVELS.join(', ')}`);
+};
 
-router.delete('/subjects/:subjectId',
-  validate([
-    param('subjectId').isUUID()
-  ]),
-  superAdminController.deleteSubject
-);
+const pagination = [
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+];
 
-// Topic Management
-router.post('/subjects/:subjectId/topics',
-  validate([
-    param('subjectId').isUUID(),
-    body('topic_name').notEmpty()
-  ]),
-  superAdminController.addTopic
-);
+// ---- Dashboard ------------------------------------------------------------------
 
-router.put('/topics/:topicId',
-  validate([
-    param('topicId').isUUID()
-  ]),
-  superAdminController.updateTopic
-);
+router.get('/statistics', getPlatformStatistics);
 
-router.delete('/topics/:topicId',
-  validate([
-    param('topicId').isUUID()
-  ]),
-  superAdminController.deleteTopic
-);
+// ---- Schools --------------------------------------------------------------------
 
-// School Curriculum Assignments
-router.post('/schools/:schoolId/curricula',
-  validate([
-    param('schoolId').isUUID(),
-    body('curriculum_id').isUUID(),
-    body('grade_level').isIn(['R', '1', '2', '3', 'R-3']),
-    body('academic_year').isInt({ min: 2000, max: 2100 })
-  ]),
-  superAdminController.assignCurriculumToSchool
-);
+const schoolRules = (creating) => [
+  creating ? requiredText('school_name', 'School name') : requiredText('school_name', 'School name').optional(),
+  creating ? email('contact_email') : email('contact_email', { optional: true }),
+  phone('contact_phone'),
+  optionalText('address', 500),
+  optionalText('city', 100),
+  body('province').optional({ values: 'falsy' }).isIn(PROVINCES).withMessage('Choose a South African province'),
+  optionalText('country', 100),
+];
 
-router.get('/schools/:schoolId/curricula', superAdminController.getSchoolCurricula);
-router.delete('/schools/:schoolId/curricula/:assignmentId', superAdminController.removeCurriculumFromSchool);
+const staffInviteRules = [
+  requiredText('first_name', 'First name', 100),
+  requiredText('last_name', 'Last name', 100),
+  email(),
+  phone('phone'),
+];
 
-// Platform Statistics
-router.get('/statistics', superAdminController.getPlatformStatistics);
-router.get('/users', superAdminController.getAllUsers); // Correct
-// Add these routes after the existing routes
-router.post('/users',
-  validate([
-    body('email').isEmail(),
-    body('password').optional().isLength({ min: 6 }),
-    body('first_name').notEmpty(),
-    body('last_name').notEmpty(),
-    body('role').isIn(['school_admin', 'teacher', 'learner']),
-    body('school_id').optional().isUUID()
-  ]),
-  superAdminController.createUser
-);
+router.get('/schools', validate([
+  query('status').optional().isIn(['active', 'inactive', 'no_admin']),
+  ...pagination,
+]), schools.listSchools);
+router.post('/schools', validate(schoolRules(true)), schools.createSchool);
+router.get('/schools/:schoolId', schools.getSchool);
+router.put('/schools/:schoolId', validate(schoolRules(false)), schools.updateSchool);
+router.patch('/schools/:schoolId/status', validate([isActive]), schools.setSchoolStatus);
+router.delete('/schools/:schoolId', schools.deleteSchool);
+router.post('/schools/:schoolId/admins', validate(staffInviteRules), schools.inviteSchoolAdmin);
 
-router.get('/users/:userId', superAdminController.getUserById);
+router.post('/schools/:schoolId/curricula', validate([
+  body('curriculum_id').isUUID().withMessage('Choose a curriculum'),
+  gradeLevel(),
+  body('academic_year').isInt({ min: 2000, max: 2100 }).withMessage('Enter a valid year').toInt(),
+]), schools.assignCurriculum);
+router.delete('/schools/:schoolId/curricula/:assignmentId', schools.unassignCurriculum);
 
-router.put('/users/:userId',
-  validate([
-    param('userId').isUUID(),
-    body('first_name').optional().notEmpty(),
-    body('last_name').optional().notEmpty(),
-    body('phone').optional(),
-    body('school_id').optional().isUUID()
-  ]),
-  superAdminController.updateUser
-);
+// ---- Curricula, subjects, topics -------------------------------------------------
 
-router.patch('/users/:userId/toggle-active', superAdminController.toggleUserActivation);
+router.get('/curricula', curricula.listCurricula);
+router.post('/curricula', validate([
+  requiredText('curriculum_name', 'Curriculum name'),
+  optionalText('description'),
+]), curricula.createCurriculum);
+router.put('/curricula/:curriculumId', validate([
+  requiredText('curriculum_name', 'Curriculum name').optional(),
+  optionalText('description'),
+]), curricula.curriculum.update);
+router.patch('/curricula/:curriculumId/status', validate([isActive]), curricula.curriculum.setStatus);
+router.delete('/curricula/:curriculumId', curricula.curriculum.remove);
 
-router.patch('/users/:userId/change-password',
-  validate([
-    param('userId').isUUID(),
-    body('new_password').isLength({ min: 6 })
-  ]),
-  superAdminController.changeUserPassword
-);
+const subjectRules = (creating) => [
+  creating ? requiredText('subject_name', 'Subject name') : requiredText('subject_name', 'Subject name').optional(),
+  optionalText('subject_code', 50),
+  gradeLevel('grade_level', { optional: !creating }),
+  optionalText('description'),
+];
+router.post('/curricula/:curriculumId/subjects', validate(subjectRules(true)), curricula.createSubject);
+router.put('/subjects/:subjectId', validate(subjectRules(false)), curricula.subject.update);
+router.patch('/subjects/:subjectId/status', validate([isActive]), curricula.subject.setStatus);
+router.delete('/subjects/:subjectId', curricula.subject.remove);
 
- // Temporary - will create proper user management
+const topicRules = (creating) => [
+  creating ? requiredText('topic_name', 'Topic name') : requiredText('topic_name', 'Topic name').optional(),
+  optionalText('topic_code', 50),
+  optionalText('description'),
+  optionalText('learning_objectives'),
+];
+router.post('/subjects/:subjectId/topics', validate(topicRules(true)), curricula.createTopic);
+router.put('/topics/:topicId', validate(topicRules(false)), curricula.topic.update);
+router.patch('/topics/:topicId/status', validate([isActive]), curricula.topic.setStatus);
+router.delete('/topics/:topicId', curricula.topic.remove);
+
+// ---- Staff accounts --------------------------------------------------------------
+
+router.get('/users', validate([
+  query('role').optional().isIn(['school_admin', 'teacher']),
+  query('status').optional().isIn(['active', 'inactive', 'pending']),
+  query('school_id').optional().isUUID(),
+  ...pagination,
+]), users.listUsers);
+router.post('/users', validate([
+  ...staffInviteRules,
+  body('role').isIn(['school_admin', 'teacher']).withMessage('Choose School Admin or Teacher'),
+  body('school_id').isUUID().withMessage('Choose a school'),
+]), users.inviteUser);
+router.get('/users/:userId', users.getUser);
+router.put('/users/:userId', validate([
+  requiredText('first_name', 'First name', 100).optional(),
+  requiredText('last_name', 'Last name', 100).optional(),
+  email('email', { optional: true }),
+  phone('phone'),
+  body('school_id').optional().isUUID().withMessage('Choose a school'),
+]), users.updateUser);
+router.patch('/users/:userId/status', validate([isActive]), users.setUserStatus);
+router.post('/users/:userId/account-link', users.sendAccountLink);
 
 export default router;

@@ -32,7 +32,10 @@ describe('runMigrations', () => {
     await pool.query('DELETE FROM schema_migrations');
 
     // Re-running 001 on top of existing tables would throw; baselining must skip it.
-    await expect(runMigrations(pool, silent)).resolves.toEqual([]);
+    // Later migrations are idempotent and are (re)applied on top.
+    const applied = await runMigrations(pool, silent);
+
+    expect(applied).not.toContain('001_initial_schema.sql');
     expect(await appliedNames()).toContain('001_initial_schema.sql');
   });
 

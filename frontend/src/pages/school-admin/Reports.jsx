@@ -1,366 +1,230 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Button, Row, Col, Form, Table, Badge, Dropdown, ProgressBar, Spinner } from 'react-bootstrap';
-import { Bar, Line, Pie } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, PointElement, LineElement, ArcElement } from 'chart.js';
-import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import { useState } from 'react';
+import { Button, Form, Table } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
+import { LuChartColumn, LuCircleCheck, LuClipboardList, LuTrendingUp, LuUsers, LuLifeBuoy } from 'react-icons/lu';
+import { useApi, useDocumentTitle } from '../../hooks/useApi';
+import { CAPS_LEVELS, CLASS_GRADES, capsLevel, gradeLabel } from '../../lib/format';
+import PageHeader from '../../components/ui/PageHeader';
+import StatCard from '../../components/ui/StatCard';
+import EmptyState from '../../components/ui/EmptyState';
+import FullPageLoader from '../../components/ui/FullPageLoader';
+import { BarsChart } from '../../components/charts/Charts';
 
-// Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+const percent = (value) => (value === null || value === undefined ? '—' : `${value}%`);
 
 const Reports = () => {
-  const [loading, setLoading] = useState(true);
-  const [gradeLevel, setGradeLevel] = useState('all');
-  const [term, setTerm] = useState('all');
-  
-  // Data states
-  const [performanceData, setPerformanceData] = useState(null);
-  const [worksheetData, setWorksheetData] = useState(null);
+  useDocumentTitle('Reports');
+  const [filters, setFilters] = useState({ year: '', grade: '', term: '' });
+  const { data, loading, error, reload } = useApi('/api/school-admin/reports/performance', {
+    year: filters.year || undefined,
+    grade: filters.grade || undefined,
+    term: filters.term || undefined,
+  });
+  const set = (name) => (e) => setFilters((current) => ({ ...current, [name]: e.target.value }));
 
-  useEffect(() => {
-    fetchReportData();
-  }, [gradeLevel, term]);
-
-  const fetchReportData = async () => {
-    try {
-      setLoading(true);
-      const [perfRes, wsRes] = await Promise.all([
-        axios.get('/api/school-admin/reports/performance', {
-          params: { grade_level: gradeLevel, term_number: term }
-        }),
-        axios.get('/api/school-admin/reports/worksheets')
-      ]);
-
-      if (perfRes.data.status === 'success') {
-        setPerformanceData(perfRes.data.data);
-      }
-      if (wsRes.data.status === 'success') {
-        setWorksheetData(wsRes.data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching reports:', error);
-      toast.error('Failed to load report data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Prepare Chart Data
-  const gradeBarData = useMemo(() => {
-    if (!performanceData?.class_performance) return { labels: [], datasets: [] };
-    
-    // Group by grade
-    const grades = ['R', '1', '2', '3'];
-    const data = grades.map(g => {
-      const classes = performanceData.class_performance.filter(c => c.grade_level === g);
-      if (classes.length === 0) return 0;
-      return classes.reduce((acc, c) => acc + parseFloat(c.average_score), 0) / classes.length;
-    });
-
-    return {
-      labels: ['Grade R', 'Grade 1', 'Grade 2', 'Grade 3'],
-      datasets: [
-        {
-          label: 'Average Score (%)',
-          data: data,
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1,
-        },
-      ],
-    };
-  }, [performanceData]);
-
-  const subjectPieData = useMemo(() => {
-    if (!performanceData?.subject_performance) return { labels: [], datasets: [] };
-    
-    return {
-      labels: performanceData.subject_performance.map(s => s.subject_name),
-      datasets: [
-        {
-          label: 'Subject Performance',
-          data: performanceData.subject_performance.map(s => s.average_score),
-          backgroundColor: [
-            'rgba(255, 99, 132, 0.6)',
-            'rgba(54, 162, 235, 0.6)',
-            'rgba(75, 192, 192, 0.6)',
-            'rgba(255, 205, 86, 0.6)',
-            'rgba(153, 102, 255, 0.6)',
-          ],
-          borderWidth: 1,
-        },
-      ],
-    };
-  }, [performanceData]);
-
-  const handleDownloadPDF = () => {
-    // Hide non-printable elements and trigger print
-    window.print();
-  };
-
-  const statistics = [
-    { title: 'Total Learners', value: performanceData?.summary?.total_learners || 0, color: 'primary', icon: 'people' },
-    { title: 'Average Score', value: `${performanceData?.summary?.average_score || 0}%`, color: 'success', icon: 'graph-up' },
-    { title: 'Distinctions', value: performanceData?.summary?.distinctions_count || 0, color: 'info', icon: 'award' },
-    { title: 'Assessments', value: performanceData?.summary?.total_assessments || 0, color: 'warning', icon: 'clipboard' },
-  ];
-
-  if (loading && !performanceData) {
+  if (loading && !data) return <FullPageLoader label="Loading reports…" />;
+  if (error && !data) {
     return (
-      <div className="text-center py-5">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-3 text-muted">Generating real-time reports...</p>
-      </div>
+      <EmptyState icon={LuChartColumn} title="Couldn’t load reports" action={<Button onClick={reload}>Try again</Button>}>
+        {error}
+      </EmptyState>
     );
   }
 
+  const { summary, levels, classes, subjects, needsSupport } = data;
+  const hasMarks = summary.marks > 0;
+  // Every level 7 → 1 in order, so the shape of the distribution is honest.
+  const levelData = [7, 6, 5, 4, 3, 2, 1].map((level) => ({
+    level: `L${level}`,
+    marks: levels.find((l) => l.level === level)?.marks ?? 0,
+  }));
+  const atLeastAdequate = levels.filter((l) => l.level >= 4).reduce((n, l) => n + l.marks, 0);
+
   return (
-    <div className="reports-container">
-      {/* Styles for PDF/Print */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          .navbar, .sidebar, .btn, .dropdown, .filters-card { display: none !important; }
-          .container-fluid { padding: 0 !important; margin: 0 !important; width: 100% !important; }
-          .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; break-inside: avoid; }
-          body { background: white !important; }
-          .h3 { font-size: 24pt !important; margin-bottom: 20px !important; }
-          .print-header { display: block !important; margin-bottom: 30px; text-align: center; }
-          .row { margin: 0 !important; }
-          .col-lg-8, .col-lg-4, .col-md-4, .col-lg-6 { width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; }
-        }
-        .print-header { display: none; }
-      `}} />
+    <>
+      <PageHeader
+        title="Reports"
+        description="How learners are doing, from the marks teachers record. Levels follow the CAPS 7-point scale."
+      />
 
-      <div className="print-header">
-        <h1>Edulens LMS - School Performance Report</h1>
-        <p className="text-muted">Generated on {new Date().toLocaleDateString()}</p>
-        <hr />
-      </div>
-
-      <div className="d-flex justify-content-between align-items-center mb-4 d-print-none">
-        <div>
-          <h1 className="h3 mb-2">Analytics & Reports</h1>
-          <p className="text-muted">Comprehensive insights from school data</p>
+      <section className="el-panel mb-4" aria-label="Report filters">
+        <div className="el-toolbar border-0">
+          <Form.Select aria-label="Year" value={filters.year || data.year} onChange={set('year')}>
+            {data.years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </Form.Select>
+          <Form.Select aria-label="Grade" value={filters.grade} onChange={set('grade')}>
+            <option value="">All grades</option>
+            {CLASS_GRADES.map((g) => (
+              <option key={g} value={g}>
+                {gradeLabel(g)}
+              </option>
+            ))}
+          </Form.Select>
+          <Form.Select aria-label="Term" value={filters.term} onChange={set('term')}>
+            <option value="">Whole year</option>
+            {['1', '2', '3', '4'].map((t) => (
+              <option key={t} value={t}>
+                Term {t}
+              </option>
+            ))}
+          </Form.Select>
         </div>
-        <Button variant="primary" onClick={handleDownloadPDF}>
-          <i className="bi bi-file-pdf me-2"></i>
-          Download as PDF
-        </Button>
+      </section>
+
+      <div className="el-stat-grid">
+        <StatCard label="Average mark" value={percent(summary.average)} hint={hasMarks && `CAPS level ${capsLevel(summary.average)}`} icon={LuTrendingUp} />
+        <StatCard
+          label="At level 4 or above"
+          value={hasMarks ? `${Math.round((atLeastAdequate / summary.marks) * 100)}%` : '—'}
+          hint="Of all marks (50% and up)"
+          icon={LuCircleCheck}
+          tone="success"
+        />
+        <StatCard label="Learners assessed" value={summary.learners_assessed} icon={LuUsers} tone="neutral" />
+        <StatCard
+          label="Need support"
+          value={needsSupport.length}
+          hint="Average below 50%"
+          icon={LuLifeBuoy}
+          tone="warning"
+        />
       </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-sm mb-4 filters-card d-print-none">
-        <Card.Body>
-          <Row className="g-3">
-            <Col md={4}>
-              <Form.Group>
-                <Form.Label>Grade Level</Form.Label>
-                <Form.Select value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)}>
-                  <option value="all">All Grades</option>
-                  <option value="R">Grade R</option>
-                  <option value="1">Grade 1</option>
-                  <option value="2">Grade 2</option>
-                  <option value="3">Grade 3</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group>
-                <Form.Label>Term</Form.Label>
-                <Form.Select value={term} onChange={(e) => setTerm(e.target.value)}>
-                  <option value="all">Full Academic Year</option>
-                  <option value="1">Term 1</option>
-                  <option value="2">Term 2</option>
-                  <option value="3">Term 3</option>
-                  <option value="4">Term 4</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={4} className="d-flex align-items-end">
-              <Button variant="outline-secondary" className="w-100" onClick={fetchReportData}>
-                <i className="bi bi-arrow-clockwise me-2"></i> Refresh Data
-              </Button>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
-
-      {/* Statistics Cards */}
-      <Row className="g-3 mb-4">
-        {statistics.map((stat, index) => (
-          <Col key={index} xs={12} sm={6} lg={3}>
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <h6 className="text-muted mb-2 small text-uppercase fw-bold">{stat.title}</h6>
-                    <h2 className="fw-bold mb-0">{stat.value}</h2>
-                  </div>
-                  <div className={`bg-${stat.color}-subtle p-3 rounded`}>
-                    <i className={`bi bi-${stat.icon} fs-4 text-${stat.color}`}></i>
-                  </div>
+      {!hasMarks ? (
+        <section className="el-panel">
+          <EmptyState icon={LuClipboardList} title="No marks for this selection yet">
+            Reports fill in as teachers record assessments. Try another year, grade or term.
+          </EmptyState>
+        </section>
+      ) : (
+        <div className="el-split">
+          <div className="el-stack">
+            <section className="el-panel" aria-labelledby="classes-heading">
+              <div className="el-panel__header">
+                <div>
+                  <h2 id="classes-heading" className="el-panel__title">
+                    Classes
+                  </h2>
+                  <p className="el-panel__subtitle">Average mark per class and how many marks were below 50%.</p>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      {/* Charts */}
-      <Row className="g-4 mb-4">
-        <Col lg={8}>
-          <Card className="border-0 shadow-sm h-100">
-            <Card.Body>
-              <Card.Title className="mb-4">Grade Level Performance</Card.Title>
-              <div style={{ height: '300px' }}>
-                <Bar 
-                  data={gradeBarData} 
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, max: 100 } }
-                  }} 
-                />
               </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col lg={4}>
-          <Card className="border-0 shadow-sm h-100">
-            <Card.Body>
-              <Card.Title className="mb-4">Subject Averages</Card.Title>
-              <div style={{ height: '300px' }}>
-                <Pie data={subjectPieData} options={{ responsive: true, maintainAspectRatio: false }} />
+              <div className="el-table-wrap">
+                <Table className="el-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Class</th>
+                      <th scope="col" className="d-none d-md-table-cell">Class teacher</th>
+                      <th scope="col" className="text-end d-none d-sm-table-cell">Assessments</th>
+                      <th scope="col" className="text-end">Average</th>
+                      <th scope="col" className="text-end d-none d-sm-table-cell">Below 50%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classes.map((c) => (
+                      <tr key={c.class_id}>
+                        <td>
+                          <Link to={`/school-admin/classes/${c.class_id}`} className="el-cell-primary">
+                            {c.class_name}
+                          </Link>
+                          <div className="el-cell-secondary">{gradeLabel(c.grade_level)}</div>
+                        </td>
+                        <td className="d-none d-md-table-cell">
+                          {c.teacher_first_name ? `${c.teacher_first_name} ${c.teacher_last_name}` : '—'}
+                        </td>
+                        <td className="text-end tabular-nums d-none d-sm-table-cell">{c.assessments}</td>
+                        <td className="text-end tabular-nums" title={CAPS_LEVELS[capsLevel(c.average)]}>
+                          <span className="fw-semibold">{percent(c.average)}</span>
+                          <span className="el-cell-secondary"> · L{capsLevel(c.average)}</span>
+                        </td>
+                        <td className="text-end tabular-nums d-none d-sm-table-cell">{c.marks_below_50}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
               </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+            </section>
 
-      {/* Top Classes Table */}
-      <Card className="border-0 shadow-sm mb-4">
-        <Card.Body>
-          <Card.Title className="mb-4">Class Performance Breakdown</Card.Title>
-          <div className="table-responsive">
-            <Table hover className="align-middle">
-              <thead className="table-light">
-                <tr>
-                  <th>Class Name</th>
-                  <th>Grade</th>
-                  <th>Teacher</th>
-                  <th>Avg Score</th>
-                  <th>Pass Rate</th>
-                  <th>Distinctions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {performanceData?.class_performance?.map((cls, index) => {
-                  const totalGraded = parseInt(cls.pass_count) + parseInt(cls.fail_count);
-                  const passRate = totalGraded > 0 ? Math.round((parseInt(cls.pass_count) + parseInt(cls.distinction_count)) / cls.total_learners * 100) : 0;
-                  
-                  return (
-                    <tr key={index}>
-                      <td><strong>{cls.class_name}</strong></td>
-                      <td><Badge bg="info">Grade {cls.grade_level}</Badge></td>
-                      <td>{cls.teacher_name || 'N/A'}</td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <span className="me-2 fw-bold">{cls.average_score}%</span>
-                          <div className="flex-grow-1" style={{ minWidth: '100px' }}>
-                            <ProgressBar 
-                              now={cls.average_score} 
-                              variant={cls.average_score >= 80 ? 'success' : cls.average_score >= 60 ? 'primary' : 'warning'}
-                              style={{ height: '6px' }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td>{passRate}%</td>
-                      <td><Badge bg="success" pill>{cls.distinction_count}</Badge></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
+            <section className="el-panel" aria-labelledby="levels-heading">
+              <div className="el-panel__header">
+                <div>
+                  <h2 id="levels-heading" className="el-panel__title">
+                    Achievement levels
+                  </h2>
+                  <p className="el-panel__subtitle">
+                    Marks per CAPS level, from Outstanding (L7, 80%+) to Not achieved (L1, below 30%).
+                  </p>
+                </div>
+              </div>
+              <div className="el-panel__body">
+                <BarsChart data={levelData} xKey="level" yKey="marks" label="Marks per achievement level" unit="marks" />
+              </div>
+            </section>
+
+            <section className="el-panel" aria-labelledby="subjects-heading">
+              <div className="el-panel__header">
+                <h2 id="subjects-heading" className="el-panel__title">
+                  Subjects
+                </h2>
+              </div>
+              <ul className="el-list">
+                {subjects.map((s) => (
+                  <li key={s.subject_name}>
+                    <div>
+                      <div className="el-cell-primary">{s.subject_name}</div>
+                      <div className="el-cell-secondary">
+                        {s.assessments} assessment{s.assessments === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                    <span className="d-flex align-items-center gap-3">
+                      <span className={`el-level el-level--${capsLevel(s.average)}`} title={CAPS_LEVELS[capsLevel(s.average)]}>
+                        Level {capsLevel(s.average)}
+                      </span>
+                      <span className="el-cell-primary tabular-nums el-percent">{percent(s.average)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
-        </Card.Body>
-      </Card>
 
-      {/* Worksheet Usage */}
-      <Row className="g-4 mb-4">
-        <Col md={12}>
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <Card.Title className="mb-4">AI Worksheet Generation Statistics</Card.Title>
-              <Row className="text-center">
-                <Col md={3} className="border-end">
-                  <div className="h2 fw-bold mb-0">{worksheetData?.summary?.total_worksheets || 0}</div>
-                  <div className="text-muted small">Total Generated</div>
-                </Col>
-                <Col md={3} className="border-end">
-                  <div className="h2 fw-bold text-success mb-0">{worksheetData?.summary?.completed || 0}</div>
-                  <div className="text-muted small">Success Rate</div>
-                </Col>
-                <Col md={3} className="border-end">
-                  <div className="h2 fw-bold text-primary mb-0">{worksheetData?.summary?.teachers_active || 0}</div>
-                  <div className="text-muted small">Active Teachers</div>
-                </Col>
-                <Col md={3}>
-                  <div className="h2 fw-bold text-info mb-0">
-                    {worksheetData?.summary?.last_generated ? new Date(worksheetData.summary.last_generated).toLocaleDateString() : 'N/A'}
-                  </div>
-                  <div className="text-muted small">Last Activity</div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Areas Needing Attention */}
-      <Card className="border-0 shadow-sm">
-        <Card.Body>
-          <Card.Title className="mb-4 text-danger">Subjects Requiring Attention (Below 60%)</Card.Title>
-          <div className="table-responsive">
-            <Table hover>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Avg Score</th>
-                  <th>Learners Assessed</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {performanceData?.subject_performance?.filter(s => s.average_score < 60).length === 0 ? (
-                  <tr><td colSpan="4" className="text-center text-muted py-3">No subjects currently below threshold. Great job!</td></tr>
-                ) : (
-                  performanceData?.subject_performance?.filter(s => s.average_score < 60).map((subj, index) => (
-                    <tr key={index}>
-                      <td><strong>{subj.subject_name}</strong></td>
-                      <td className="text-danger fw-bold">{subj.average_score}%</td>
-                      <td>{subj.learners_assessed}</td>
-                      <td><Badge bg="danger">Critical Focus</Badge></td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </Table>
-          </div>
-        </Card.Body>
-      </Card>
-    </div>
+          <section className="el-panel" aria-labelledby="support-heading">
+            <div className="el-panel__header">
+              <div>
+                <h2 id="support-heading" className="el-panel__title">
+                  Learners who need support
+                </h2>
+                <p className="el-panel__subtitle">Average below 50%, lowest first.</p>
+              </div>
+            </div>
+            {needsSupport.length === 0 ? (
+              <EmptyState compact icon={LuCircleCheck} title="Nobody is below 50%" />
+            ) : (
+              <ul className="el-list">
+                {needsSupport.map((l) => (
+                  <li key={l.learner_id}>
+                    <Link to={`/school-admin/learners/${l.learner_id}`} className="el-list-link">
+                      <span className="min-w-0">
+                        <span className="el-cell-primary d-block">
+                          {l.first_name} {l.last_name}
+                        </span>
+                        <span className="el-cell-secondary">
+                          {l.class_name ?? 'Not in a class'} · {l.marks} mark{l.marks === 1 ? '' : 's'}
+                        </span>
+                      </span>
+                      <span className="el-cell-primary tabular-nums">{percent(l.average)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      )}
+    </>
   );
 };
 

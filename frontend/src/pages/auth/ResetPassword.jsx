@@ -1,173 +1,125 @@
-import React, { useState } from 'react';
-import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Button, Form, Spinner } from 'react-bootstrap';
+import { Link, useSearchParams } from 'react-router-dom';
+import { LuArrowLeft, LuCircleCheck, LuLink2Off } from 'react-icons/lu';
 import { useAuth } from '../../contexts/useAuth';
+import AuthLayout from '../../components/auth/AuthLayout';
+import FormAlert from '../../components/ui/FormAlert';
+import PasswordField from '../../components/ui/PasswordField';
+import { PASSWORD_MIN_LENGTH, validatePasswords } from '../../lib/passwords';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
-  const [formData, setFormData] = useState({
-    password: '',
-    confirmPassword: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const { resetPassword } = useAuth();
-  const navigate = useNavigate();
+  const [form, setForm] = useState({ password: '', confirm: '' });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [error, setError] = useState(null);
+  const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setForm((current) => ({ ...current, [e.target.name]: e.target.value }));
+    setFieldErrors((current) => ({ ...current, [e.target.name]: undefined }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    setMessage('');
+    const errors = validatePasswords(form);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
-    const result = await resetPassword(token, formData.password);
-    
-    if (result.success) {
-      setMessage('Password reset successfully! Redirecting to login...');
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
-    } else {
-      setError(result.error);
-    }
-    
-    setLoading(false);
+    setSubmitting(true);
+    setError(null);
+    const result = await resetPassword(token, form.password);
+    setSubmitting(false);
+    if (result.ok) setDone(true);
+    else setError(result.message);
   };
 
   if (!token) {
     return (
-      <div className="min-vh-100 d-flex align-items-center bg-light">
-        <Container>
-          <Row className="justify-content-center">
-            <Col xs={12} md={8} lg={6} xl={5}>
-              <Alert variant="danger" className="text-center">
-                Invalid or missing reset token. Please request a new password reset link.
-              </Alert>
-              <div className="text-center mt-3">
-                <Link to="/forgot-password" className="btn btn-primary">
-                  Request New Reset Link
-                </Link>
-              </div>
-            </Col>
-          </Row>
-        </Container>
-      </div>
+      <AuthLayout title="This link isn’t valid">
+        <div className="el-success-state el-success-state--warning">
+          <span className="el-success-state__icon">
+            <LuLink2Off size={26} aria-hidden="true" />
+          </span>
+          <p>The reset link is incomplete. Request a new one and use the latest email we send you.</p>
+          <Link to="/forgot-password" className="btn btn-primary w-100">
+            Request a new link
+          </Link>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (done) {
+    return (
+      <AuthLayout title="Password updated">
+        <div className="el-success-state">
+          <span className="el-success-state__icon">
+            <LuCircleCheck size={26} aria-hidden="true" />
+          </span>
+          <p>Your password has been changed and you’ve been signed out on other devices.</p>
+          <Link to="/login" className="btn btn-primary btn-lg w-100">
+            Sign in
+          </Link>
+        </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="min-vh-100 d-flex align-items-center bg-light">
-      <Container>
-        <Row className="justify-content-center">
-          <Col xs={12} md={8} lg={6} xl={5}>
-            <div className="text-center mb-4">
-              <h1 className="text-primary fw-bold">
-                <i className="bi bi-mortarboard-fill me-2"></i>
-                Edulens LMS
-              </h1>
-            </div>
-            
-            <Card className="shadow-sm border-0">
-              <Card.Body className="p-4 p-md-5">
-                <h2 className="text-center mb-4">Reset Your Password</h2>
-                <p className="text-center text-muted mb-4">
-                  Enter your new password below.
-                </p>
-                
-                {message && (
-                  <Alert variant="success" className="text-center">
-                    <i className="bi bi-check-circle-fill me-2"></i>
-                    {message}
-                  </Alert>
-                )}
-                
-                {error && (
-                  <Alert variant="danger" className="text-center">
-                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                    {error}
-                  </Alert>
-                )}
-                
-                <Form onSubmit={handleSubmit}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>New Password</Form.Label>
-                    <Form.Control
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="Enter new password"
-                      required
-                      size="lg"
-                    />
-                    <Form.Text className="text-muted">
-                      Must be at least 6 characters long.
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group className="mb-4">
-                    <Form.Label>Confirm New Password</Form.Label>
-                    <Form.Control
-                      type="password"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      placeholder="Confirm new password"
-                      required
-                      size="lg"
-                    />
-                  </Form.Group>
-
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    size="lg"
-                    className="w-100 mb-3"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Resetting...
-                      </>
-                    ) : (
-                      'Reset Password'
-                    )}
-                  </Button>
-                </Form>
-
-                <div className="text-center mt-4">
-                  <Link to="/login" className="text-decoration-none">
-                    <i className="bi bi-arrow-left me-2"></i>
-                    Back to Login
-                  </Link>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    </div>
+    <AuthLayout
+      title="Choose a new password"
+      subtitle="Pick something you haven’t used before."
+      footer={
+        <Link to="/login" className="d-inline-flex align-items-center gap-1 fw-semibold">
+          <LuArrowLeft aria-hidden="true" /> Back to sign in
+        </Link>
+      }
+    >
+      <FormAlert variant="danger">
+        {error && (
+          <>
+            {error}{' '}
+            <Link to="/forgot-password" className="alert-link">
+              Request a new link
+            </Link>
+          </>
+        )}
+      </FormAlert>
+      <Form onSubmit={handleSubmit} noValidate>
+        <PasswordField
+          label="New password"
+          name="password"
+          value={form.password}
+          onChange={handleChange}
+          autoComplete="new-password"
+          hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
+          error={fieldErrors.password}
+          autoFocus
+        />
+        <PasswordField
+          label="Confirm new password"
+          name="confirm"
+          value={form.confirm}
+          onChange={handleChange}
+          autoComplete="new-password"
+          error={fieldErrors.confirm}
+        />
+        <Button type="submit" variant="primary" size="lg" className="w-100 mt-2" disabled={submitting}>
+          {submitting ? (
+            <>
+              <Spinner size="sm" className="me-2" aria-hidden="true" />
+              Updating password…
+            </>
+          ) : (
+            'Update password'
+          )}
+        </Button>
+      </Form>
+    </AuthLayout>
   );
 };
 

@@ -22,7 +22,8 @@ export const protect = (roles = []) => {
       // 3. Verify user and school status in Database
       // This is a security layer to catch deactivated accounts immediately
       const statusQuery = `
-        SELECT u.is_active as user_active, s.is_active as school_active, u.role
+        SELECT u.is_active as user_active, s.is_active as school_active, u.role,
+               EXTRACT(EPOCH FROM u.password_changed_at) AS password_changed_epoch
         FROM users u
         LEFT JOIN schools s ON u.school_id = s.school_id
         WHERE u.user_id = $1
@@ -37,8 +38,16 @@ export const protect = (roles = []) => {
         });
       }
       
-      const { user_active, school_active, role } = statusResult.rows[0];
-      
+      const { user_active, school_active, role, password_changed_epoch } = statusResult.rows[0];
+
+      // Changing or resetting a password invalidates every token issued before it.
+      if (password_changed_epoch !== null && decoded.iat < Number(password_changed_epoch)) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Session expired. Please sign in again.'
+        });
+      }
+
       if (!user_active) {
         return res.status(401).json({
           status: 'error',
@@ -95,3 +104,4 @@ export const requireSuperAdmin = protect(['super_admin']);
 export const requireSchoolAdmin = protect(['school_admin']);
 export const requireTeacher = protect(['teacher']);
 export const requireAdminOrTeacher = protect(['school_admin', 'teacher']);
+export const requireParent = protect(['parent']);

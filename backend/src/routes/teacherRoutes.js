@@ -1,346 +1,122 @@
-// import express from 'express';
-// import { requireTeacher } from '../middleware/authMiddleware.js';
-// import * as teacherController from '../controllers/teacherController.js';
-// import { validate } from '../middleware/validationMiddleware.js';
-// import { body, param } from 'express-validator';
-// import { uploadSingle } from '../middleware/uploadMiddleware.js';
-
-// const router = express.Router();
-
-// // Apply teacher middleware to all routes
-// router.use(requireTeacher);
-
-// // Dashboard
-// router.get('/dashboard', teacherController.getDashboard);
-
-// // Class Management
-// router.get('/classes/:classId', 
-//   param('classId').isUUID(),
-//   teacherController.getClassDetails
-// );
-
-// router.get('/classes/:classId/learners',
-//   param('classId').isUUID(),
-//   teacherController.getClassLearners
-// );
-
-// router.get('/classes/:classId/assessments',
-//   param('classId').isUUID(),
-//   teacherController.getClassAssessments
-// );
-
-// router.get('/classes/:classId/statistics',
-//   param('classId').isUUID(),
-//   teacherController.getClassStatistics
-// );
-
-// // Bulk Learners Management
-// router.post('/classes/:classId/learners/bulk',
-//   param('classId').isUUID(),
-//   validate([
-//     body('learners').isArray(),
-//     body('learners.*.first_name').notEmpty(),
-//     body('learners.*.last_name').notEmpty(),
-//     body('learners.*.date_of_birth').optional().isISO8601(),
-//     body('learners.*.gender').optional().isString(),
-//     body('learners.*.guardian_name').optional().isString(),
-//     body('learners.*.guardian_email').optional().isEmail(),
-//     body('learners.*.guardian_phone').optional().isString()
-//   ]),
-//   teacherController.bulkAddLearners
-// );
-
-// router.post('/learners/bulk-import',
-//   uploadSingle('file'),
-//   validate([
-//     body('class_id').isUUID()
-//   ]),
-//   teacherController.bulkImportLearners
-// );
-
-// // Assessment Management
-// router.post('/assessments',
-//   validate([
-//     body('class_id').isUUID(),
-//     body('assessment_name').notEmpty(),
-//     body('assessment_type').isIn(['test', 'quiz', 'project', 'worksheet', 'assignment']),
-//     body('total_marks').isNumeric(),
-//     body('term_number').isIn(['1', '2', '3', '4'])
-//   ]),
-//   teacherController.createAssessment
-// );
-
-// router.get('/assessments/:assessmentId/gradebook',
-//   param('assessmentId').isUUID(),
-//   teacherController.getAssessmentGradebook
-// );
-
-// router.post('/assessments/:assessmentId/bulk-grade',
-//   param('assessmentId').isUUID(),
-//   validate([
-//     body('grades').isArray(),
-//     body('grades.*.learner_id').isUUID(),
-//     body('grades.*.marks_obtained').optional().isNumeric(),
-//     body('grades.*.percentage').optional().isNumeric().custom(value => value >= 0 && value <= 100)
-//   ]),
-//   teacherController.bulkGradeAssessment
-// );
-
-// // Worksheet Management
-// router.post('/worksheets/generate',
-//   validate([
-//     body('curriculum_id').isUUID(),
-//     body('subject_id').isUUID(),
-//     body('topic_id').isUUID(),
-//     body('grade_level').isIn(['R', '1', '2', '3']),
-//     body('difficulty').isIn(['easy', 'medium', 'hard', 'mixed']),
-//     body('number_of_questions').isInt({ min: 1, max: 50 })
-//   ]),
-//   teacherController.generateWorksheet
-// );
-
-// router.post('/worksheets/save',
-//   validate([
-//     body('request_id').isUUID(),
-//     body('worksheet_title').notEmpty(),
-//     body('content_html').notEmpty()
-//   ]),
-//   teacherController.saveWorksheet
-// );
-
-// router.get('/worksheets/history', teacherController.getWorksheetHistory);
-// // Add to the existing bulk learners route validation:
-// router.post('/classes/:classId/learners/bulk',
-//   param('classId').isUUID(),
-//   validate([
-//     body('learners').isArray(),
-//     body('learners.*.first_name').notEmpty(),
-//     body('learners.*.last_name').notEmpty(),
-//     body('learners.*.date_of_birth').isISO8601(),
-//     body('learners.*.gender').optional().isString(),
-//     body('learners.*.guardian_name').optional().isString(),
-//     body('learners.*.guardian_email').optional().isEmail(),
-//     body('learners.*.guardian_phone').optional().isString(),
-//     body('learners.*.has_special_needs').optional().isBoolean(),
-//     body('learners.*.special_needs_notes').optional().isString(),
-//     body('learners.*.medical_notes').optional().isString()
-//   ]),
-//   teacherController.bulkAddLearners
-// );
-// // Learner Management
-// router.get('/learners/:learnerId',
-//   param('learnerId').isUUID(),
-//   teacherController.getLearnerProfile
-// );
-// // Assessment Management Routes
-// router.get('/assessments', teacherController.getAssessments);
-
-// router.get('/assessment-data', teacherController.getAssessmentData);
-
-// router.get('/assessments/:assessmentId',
-//   param('assessmentId').isUUID(),
-//   teacherController.getAssessment
-// );
-
-// router.put('/assessments/:assessmentId',
-//   param('assessmentId').isUUID(),
-//   validate([
-//     body('assessment_name').optional().notEmpty(),
-//     body('total_marks').optional().isNumeric(),
-//     body('due_date').optional().isISO8601(),
-//     body('scheduled_date').optional().isISO8601(),
-//     body('description').optional().isString()
-//   ]),
-//   teacherController.updateAssessment
-// );
-
-// router.delete('/assessments/:assessmentId',
-//   param('assessmentId').isUUID(),
-//   teacherController.deleteAssessment
-// );
-
-// // Assessment Resources Routes
-// router.post('/assessments/:assessmentId/resources',
-//   param('assessmentId').isUUID(),
-//   uploadSingle('resource'),
-//   teacherController.uploadAssessmentResource
-// );
-
-// router.delete('/assessments/:assessmentId/resources/:resourceId',
-//   param('assessmentId').isUUID(),
-//   param('resourceId').isUUID(),
-//   teacherController.deleteAssessmentResource
-// );
-
-// export default router;
 import express from 'express';
+import { body, query } from 'express-validator';
 import { requireTeacher } from '../middleware/authMiddleware.js';
-import * as teacherController from '../controllers/teacherController.js';
-import { validate } from '../middleware/validationMiddleware.js';
-import { body, param } from 'express-validator';
-import { uploadSingle } from '../middleware/uploadMiddleware.js';
+import { validate, validateUuidParams } from '../middleware/validationMiddleware.js';
+import { uploadResource, uploadSpreadsheet } from '../middleware/uploadMiddleware.js';
+import { ASSESSMENT_TYPES, TERMS } from '../models/Assessment.js';
+import { learnerValidation } from '../services/learnerRules.js';
+import { CLASS_GRADES } from '../models/Class.js';
+import {
+  DIFFICULTIES,
+  LANGUAGES,
+  MAX_QUESTIONS,
+  MIN_QUESTIONS,
+  QUESTION_TYPES,
+} from '../services/worksheets/schema.js';
+import * as classes from '../controllers/teacher/classesController.js';
+import * as assessments from '../controllers/teacher/assessmentsController.js';
+import * as worksheets from '../controllers/teacher/worksheetsController.js';
 
 const router = express.Router();
 
-// Apply teacher middleware to all routes
+validateUuidParams(router, ['assessmentId', 'classId', 'learnerId', 'requestId', 'resourceId', 'worksheetId']);
+
 router.use(requireTeacher);
 
-// Dashboard
-router.get('/dashboard', teacherController.getDashboard);
+// ---- Dashboard and classes --------------------------------------------------------
 
-// Class Management
-router.get('/classes/:classId', 
-  param('classId').isUUID(),
-  teacherController.getClassDetails
-);
+router.get('/dashboard', classes.getDashboard);
 
-router.get('/classes/:classId/learners',
-  param('classId').isUUID(),
-  teacherController.getClassLearners
-);
+router.get('/classes', validate([query('year').optional().isInt({ min: 2000, max: 2100 })]), classes.listClasses);
+router.get('/classes/:classId', classes.getClass);
+router.get('/classes/:classId/marksheet', validate([query('term').optional().isIn(TERMS)]), classes.getMarksheet);
+router.post('/classes/:classId/learners', validate(learnerValidation()), classes.addLearner);
+router.post('/classes/:classId/learners/import', uploadSpreadsheet, classes.importLearnersToClass);
 
-router.get('/classes/:classId/assessments',
-  param('classId').isUUID(),
-  teacherController.getClassAssessments
-);
+router.get('/learners/:learnerId', classes.getLearner);
+router.put('/learners/:learnerId', validate(learnerValidation({ partial: true })), classes.updateLearner);
 
-router.get('/classes/:classId/statistics',
-  param('classId').isUUID(),
-  teacherController.getClassStatistics
-);
+// ---- Assessments ------------------------------------------------------------------
 
-// Bulk Learners Management
-router.post('/classes/:classId/learners/bulk',
-  param('classId').isUUID(),
-  validate([
-    body('learners').isArray(),
-    body('learners.*.first_name').notEmpty(),
-    body('learners.*.last_name').notEmpty(),
-    body('learners.*.date_of_birth').isISO8601(),
-    body('learners.*.gender').optional().isString(),
-    body('learners.*.guardian_name').optional().isString(),
-    body('learners.*.guardian_email').optional().isEmail(),
-    body('learners.*.guardian_phone').optional().isString(),
-    body('learners.*.has_special_needs').optional().isBoolean(),
-    body('learners.*.special_needs_notes').optional().isString(),
-    body('learners.*.medical_notes').optional().isString()
-  ]),
-  teacherController.bulkAddLearners
-);
+const optionalUuid = (field, label) =>
+  body(field).optional({ values: 'falsy' }).isUUID().withMessage(`Choose a ${label}`);
 
-router.post('/learners/bulk-import',
-  uploadSingle('file'),
-  validate([
-    body('class_id').isUUID()
-  ]),
-  teacherController.bulkImportLearners
-);
+const assessmentRules = (creating) => {
+  const maybe = (chain) => (creating ? chain : chain.optional());
+  return [
+    maybe(body('assessment_name')).isString().trim().notEmpty().withMessage('Give the assessment a name')
+      .isLength({ max: 255 }).withMessage('Name must be 255 characters or fewer'),
+    maybe(body('assessment_type')).isIn(ASSESSMENT_TYPES).withMessage('Choose a type'),
+    maybe(body('total_marks')).isFloat({ gt: 0, max: 1000 }).withMessage('Total marks must be between 1 and 1000').toFloat(),
+    maybe(body('term_number')).isIn(TERMS).withMessage('Choose a term'),
+    optionalUuid('subject_id', 'subject'),
+    optionalUuid('topic_id', 'topic'),
+    body('scheduled_date').optional({ values: 'falsy' }).isISO8601({ strict: true }).withMessage('Enter a valid date'),
+    body('due_date').optional({ values: 'falsy' }).isISO8601({ strict: true }).withMessage('Enter a valid date'),
+    body('description').optional({ values: 'null' }).isString().isLength({ max: 2000 }),
+  ];
+};
 
-// Assessment Management
-router.get('/assessment-data', teacherController.getAssessmentData);
+router.get('/assessments', validate([
+  query('class_id').optional().isUUID(),
+  query('term').optional().isIn(TERMS),
+  query('status').optional().isIn(['to_mark', 'marked']),
+  query('year').optional().isInt({ min: 2000, max: 2100 }),
+]), assessments.listAssessments);
 
-router.get('/assessments', teacherController.getAssessments);
+router.get('/assessments/options', validate([query('class_id').isUUID().withMessage('Choose a class')]), assessments.getOptions);
 
-router.post('/assessments',
-  validate([
-    body('class_id').isUUID(),
-    body('assessment_name').notEmpty(),
-    body('assessment_type').isIn(['test', 'quiz', 'project', 'worksheet', 'assignment']),
-    body('total_marks').isNumeric(),
-    body('term_number').isIn(['1', '2', '3', '4']),
-    body('subject_id').optional().isUUID(),
-    body('topic_id').optional().isUUID(),
-    body('curriculum_id').optional().isUUID(),
-    body('passing_marks').optional().isNumeric(),
-    body('due_date').optional().isISO8601(),
-    body('scheduled_date').optional().isISO8601(),
-    body('description').optional().isString(),
-    body('academic_year').optional().isInt()
-  ]),
-  teacherController.createAssessment
-);
+router.post('/assessments', validate([
+  body('class_id').isUUID().withMessage('Choose a class'),
+  ...assessmentRules(true),
+]), assessments.createAssessment);
 
-router.get('/assessments/:assessmentId',
-  param('assessmentId').isUUID(),
-  teacherController.getAssessment
-);
+router.get('/assessments/:assessmentId', assessments.getAssessment);
+router.put('/assessments/:assessmentId', validate(assessmentRules(false)), assessments.updateAssessment);
+router.delete('/assessments/:assessmentId', assessments.deleteAssessment);
 
-router.put('/assessments/:assessmentId',
-  param('assessmentId').isUUID(),
-  validate([
-    body('assessment_name').optional().notEmpty(),
-    body('total_marks').optional().isNumeric(),
-    body('due_date').optional().isISO8601(),
-    body('scheduled_date').optional().isISO8601(),
-    body('description').optional().isString()
-  ]),
-  teacherController.updateAssessment
-);
+router.get('/assessments/:assessmentId/marks', assessments.getMarks);
+router.put('/assessments/:assessmentId/marks', validate([
+  body('marks').isArray({ min: 1, max: 200 }).withMessage('Send at least one mark'),
+  body('marks.*.learner_id').isUUID().withMessage('Invalid learner id'),
+  body('marks.*.marks_obtained')
+    .custom((value) => value === null || (Number.isFinite(Number(value)) && Number(value) >= 0))
+    .withMessage('Marks must be a number from 0, or empty'),
+  body('marks.*.teacher_feedback').optional({ values: 'null' }).isString().isLength({ max: 1000 }),
+]), assessments.saveMarks);
 
-router.delete('/assessments/:assessmentId',
-  param('assessmentId').isUUID(),
-  teacherController.deleteAssessment
-);
+router.post('/assessments/:assessmentId/resources', uploadResource, assessments.addResource);
+router.get('/assessments/:assessmentId/resources/:resourceId/download', assessments.downloadResource);
+router.delete('/assessments/:assessmentId/resources/:resourceId', assessments.deleteResource);
 
-router.get('/assessments/:assessmentId/gradebook',
-  param('assessmentId').isUUID(),
-  teacherController.getAssessmentGradebook
-);
+// ---- AI worksheets ----------------------------------------------------------------
 
-router.post('/assessments/:assessmentId/bulk-grade',
-  param('assessmentId').isUUID(),
-  validate([
-    body('grades').isArray(),
-    body('grades.*.learner_id').isUUID(),
-    body('grades.*.marks_obtained').optional().isNumeric(),
-    body('grades.*.percentage').optional().isNumeric().custom(value => value >= 0 && value <= 100)
-  ]),
-  teacherController.bulkGradeAssessment
-);
+router.get('/worksheets/options', worksheets.getOptions);
 
-// Assessment Resources Routes
-router.post('/assessments/:assessmentId/resources',
-  param('assessmentId').isUUID(),
-  uploadSingle('resource'),
-  teacherController.uploadAssessmentResource
-);
+router.post('/worksheets/generate', validate([
+  body('subject_id').isUUID().withMessage('Choose a subject'),
+  body('topic_id').optional({ values: 'falsy' }).isUUID().withMessage('Choose a topic'),
+  body('grade_level').isIn(CLASS_GRADES).withMessage('Choose a grade'),
+  body('difficulty').isIn(DIFFICULTIES).withMessage('Choose a difficulty'),
+  body('number_of_questions').isInt({ min: MIN_QUESTIONS, max: MAX_QUESTIONS })
+    .withMessage(`Choose ${MIN_QUESTIONS} to ${MAX_QUESTIONS} questions`).toInt(),
+  body('question_types').isArray({ min: 1 }).withMessage('Choose at least one kind of question'),
+  body('question_types.*').isIn(QUESTION_TYPES).withMessage('Unknown question type'),
+  body('language').isIn(LANGUAGES).withMessage('Choose a language'),
+  body('specific_instructions').optional({ values: 'null' }).isString().isLength({ max: 500 })
+    .withMessage('Keep extra instructions under 500 characters'),
+]), worksheets.generate);
 
-router.delete('/assessments/:assessmentId/resources/:resourceId',
-  param('assessmentId').isUUID(),
-  param('resourceId').isUUID(),
-  teacherController.deleteAssessmentResource
-);
+router.get('/worksheets/requests', worksheets.listRequests);
+router.get('/worksheets/requests/:requestId', worksheets.getRequest);
 
-// Worksheet Management
-router.post('/worksheets/generate',
-  validate([
-    body('curriculum_id').isUUID(),
-    body('subject_id').isUUID(),
-    body('topic_id').isUUID(),
-    body('grade_level').isIn(['R', '1', '2', '3']),
-    body('difficulty').isIn(['easy', 'medium', 'hard', 'mixed']),
-    body('number_of_questions').isInt({ min: 1, max: 50 })
-  ]),
-  teacherController.generateWorksheet
-);
-
-router.post('/worksheets/save',
-  validate([
-    body('request_id').isUUID(),
-    body('worksheet_title').notEmpty(),
-    body('content_html').notEmpty()
-  ]),
-  teacherController.saveWorksheet
-);
-
-router.get('/worksheets/history', teacherController.getWorksheetHistory);
-router.get('/worksheets/history/:requestId', teacherController.getWorksheetDetails);
-router.get('/worksheets/saved', teacherController.getSavedWorksheets);
-
-// Learner Management
-router.get('/learners/:learnerId',
-  param('learnerId').isUUID(),
-  teacherController.getLearnerProfile
-);
+router.get('/worksheets/library', validate([query('grade').optional().isIn(CLASS_GRADES)]), worksheets.listLibrary);
+router.post('/worksheets/library', validate([
+  body('request_id').isUUID().withMessage('Invalid worksheet'),
+  body('worksheet').optional().isObject(),
+]), worksheets.saveToLibrary);
+router.get('/worksheets/library/:worksheetId', worksheets.getWorksheet);
+router.put('/worksheets/library/:worksheetId', validate([body('worksheet').isObject().withMessage('Send the worksheet')]), worksheets.updateWorksheet);
+router.delete('/worksheets/library/:worksheetId', worksheets.deleteWorksheet);
 
 export default router;

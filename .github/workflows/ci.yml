@@ -28,6 +28,9 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          # Non-UTC like local dev, so timezone bugs show up in CI too.
+          TZ: Africa/Johannesburg
+          PGTZ: Africa/Johannesburg
         ports:
           - 5432:5432
         options: >-
@@ -58,7 +61,7 @@ jobs:
       - run: npm test
 
   frontend:
-    name: Frontend (lint + build)
+    name: Frontend (lint + tests + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -75,4 +78,5 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build
