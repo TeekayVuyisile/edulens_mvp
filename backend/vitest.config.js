@@ -23,6 +23,9 @@ Object.assign(process.env, {
   SMTP_HOST: '',
   // Never call the paid AI API from tests; worksheet tests mock the generator.
   OPENAI_API_KEY: '',
+  GROQ_API_KEY: '',
+  AI_PROVIDER: '',
+  AI_STRUCTURED_OUTPUT: '',
   FRONTEND_URL: 'http://localhost:5173',
 });
 

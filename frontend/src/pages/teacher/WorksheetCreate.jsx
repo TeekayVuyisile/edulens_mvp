@@ -135,14 +135,14 @@ const WorksheetCreate = () => {
                 What to practise
               </h2>
               {ai.configured && (
-                <span className="el-cell-secondary">
+                <span className="el-cell-secondary" title={`${ai.provider} · ${ai.model}`}>
                   {ai.usedToday} of {ai.dailyLimit} today
                 </span>
               )}
             </div>
             <Form className="el-panel__body" onSubmit={runGenerate} noValidate>
               {!ai.configured && (
-                <Alert variant="warning">AI worksheets aren’t set up on this server yet. Ask your administrator to add an OpenAI API key.</Alert>
+                <Alert variant="warning">AI worksheets aren’t set up on this server yet. Ask your administrator to add a Groq or OpenAI API key.</Alert>
               )}
               {options.data.subjects.length === 0 && (
                 <Alert variant="info">Your school has no curriculum assigned yet, so there are no subjects to choose from.</Alert>

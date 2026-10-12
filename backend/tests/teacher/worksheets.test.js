@@ -102,7 +102,7 @@ describe('generating', () => {
     const res = await api('get', '/options');
 
     expect(res.body.data.subjects).toMatchObject([{ subject_name: 'Mathematics', topics: [{ topic_name: 'Counting' }] }]);
-    expect(res.body.data.ai).toEqual({ configured: true, dailyLimit: 30, usedToday: 0 });
+    expect(res.body.data.ai).toEqual({ configured: true, provider: 'OpenAI', model: 'gpt-4o-mini', dailyLimit: 30, usedToday: 0 });
   });
 
   it('generates a worksheet, records the request, and passes the curriculum context to the AI', async () => {

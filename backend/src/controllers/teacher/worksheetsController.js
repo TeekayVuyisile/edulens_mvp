@@ -3,6 +3,7 @@ import ClassModel from '../../models/Class.js';
 import Worksheet from '../../models/Worksheet.js';
 import {
   AiGenerationError,
+  aiDescription,
   AiNotConfiguredError,
   buildPrompt,
   generateWorksheet,
@@ -47,14 +48,14 @@ export const getOptions = async (req, res) => {
   ok(res, {
     subjects,
     grades: [...new Set(classes.map((c) => c.grade_level))],
-    ai: { configured: isConfigured(), dailyLimit: dailyLimit(), usedToday },
+    ai: { configured: isConfigured(), ...aiDescription(), dailyLimit: dailyLimit(), usedToday },
   });
 };
 
 // POST /api/teacher/worksheets/generate
 export const generate = async (req, res) => {
   if (!isConfigured()) {
-    throw new HttpError(503, 'AI worksheets aren’t set up on this server yet. Ask your administrator to add an OpenAI API key.');
+    throw new HttpError(503, 'AI worksheets aren’t set up on this server yet. Ask your administrator to add a Groq or OpenAI API key.');
   }
   const { subject_id: subjectId, topic_id: topicId, grade_level: grade } = req.body;
   const subject = (await schoolSubjects(req.user.schoolId)).find((s) => s.subject_id === subjectId);
@@ -96,7 +97,7 @@ export const generate = async (req, res) => {
     await Worksheet.failRequest(requestId, error.message);
     if (error instanceof AiNotConfiguredError) {
       console.error('Worksheet generation is misconfigured:', error.message);
-      throw new HttpError(503, 'AI worksheets aren’t set up correctly on this server. Ask your administrator to check the OpenAI API key.');
+      throw new HttpError(503, 'AI worksheets aren’t set up correctly on this server. Ask your administrator to check the AI key and model.');
     }
     if (error instanceof AiGenerationError) {
       console.error('Worksheet generation failed:', error.message);
