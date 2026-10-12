@@ -76,6 +76,18 @@ class ClassModel {
     return rows;
   }
 
+  /**
+   * The school's current academic year: the newest year with active classes
+   * (so a year closed in December rolls straight on), else the calendar year.
+   */
+  static async currentYear(schoolId) {
+    const { rows } = await pool.query(
+      'SELECT MAX(academic_year) AS year FROM classes WHERE school_id = $1 AND is_active',
+      [schoolId]
+    );
+    return rows[0].year ?? new Date().getFullYear();
+  }
+
   /** Years the school has classes for, newest first. */
   static async years(schoolId) {
     const { rows } = await pool.query(

@@ -1,4 +1,5 @@
 import pool from '../../config/database.js';
+import ClassModel from '../../models/Class.js';
 import { CURRENT_STATUSES } from '../../models/Learner.js';
 import { recentActivity } from '../../services/activityFeed.js';
 import { ok } from '../../utils/respond.js';
@@ -8,7 +9,7 @@ const GRADE_ORDER = `CASE c.grade_level WHEN 'R' THEN 0 WHEN '1' THEN 1 WHEN '2'
 // GET /api/school-admin/dashboard — the school at a glance, and what needs doing.
 export const getDashboard = async (req, res) => {
   const schoolId = req.user.schoolId;
-  const year = new Date().getFullYear();
+  const year = await ClassModel.currentYear(schoolId);
 
   const [summary, byGrade, classes, pendingTeachers, activity] = await Promise.all([
     pool.query(

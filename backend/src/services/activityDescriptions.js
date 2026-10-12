@@ -41,6 +41,9 @@ const PATTERNS = [
   ['POST', `/api/school-admin/classes/${ID}/learners`, 'Placed learners in a class'],
   ['DELETE', `/api/school-admin/classes/${ID}/learners/${ID}`, 'Took a learner out of a class'],
 
+  ['POST', '/api/school-admin/year-end/next-classes', 'Set up next year’s classes'],
+  ['POST', '/api/school-admin/year-end/complete', 'Closed the academic year'],
+
   ['POST', '/api/teacher/assessments', 'Created an assessment'],
   ['PUT', `/api/teacher/assessments/${ID}`, 'Updated an assessment'],
   ['DELETE', `/api/teacher/assessments/${ID}`, 'Deleted an assessment'],

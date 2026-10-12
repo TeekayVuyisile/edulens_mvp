@@ -391,3 +391,43 @@
   letter-spacing: 0;
   font-size: 0.8125rem;
 }
+
+/* ---- Year end ---------------------------------------------------------- */
+/* Same column widths in every class's table, so the page reads as one list. */
+.el-year-end-table {
+  table-layout: fixed;
+}
+
+.el-year-end-table th:nth-child(1) { width: 40%; }
+.el-year-end-table th:nth-child(2),
+.el-year-end-table th:nth-child(3) { width: 30%; }
+
+/* Phones: each learner becomes a card — name, then outcome, then class (all labelled). */
+@media (max-width: 575.98px) {
+  .el-year-end-table,
+  .el-year-end-table tbody,
+  .el-year-end-table tr,
+  .el-year-end-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .el-year-end-table thead {
+    display: none;
+  }
+
+  .el-year-end-table tr {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--el-border);
+  }
+
+  .el-year-end-table td,
+  .el-table.el-year-end-table > :not(caption) > * > * {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}

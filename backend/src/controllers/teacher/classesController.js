@@ -12,11 +12,11 @@ import { findClassForTeacher, findLearnerForTeacher, requireActiveClass } from '
 // GET /api/teacher/dashboard — today's work: what to mark, classes, and what's coming up.
 export const getDashboard = async (req, res) => {
   const teacherId = req.user.userId;
-  const year = new Date().getFullYear();
 
+  // Active classes are this year's: closing a year deactivates its classes.
   const [classes, toMark, upcoming] = await Promise.all([
-    ClassModel.forTeacher(teacherId, { year }),
-    Assessment.listForTeacher(teacherId, { year, status: 'to_mark' }),
+    ClassModel.forTeacher(teacherId),
+    Assessment.listForTeacher(teacherId, { status: 'to_mark' }),
     pool.query(
       `SELECT a.assessment_id, a.assessment_name, a.assessment_type, a.scheduled_date, c.class_name, s.subject_name
        FROM assessments a
@@ -32,7 +32,6 @@ export const getDashboard = async (req, res) => {
 
   const averages = classes.filter((c) => c.average !== null);
   ok(res, {
-    year,
     summary: {
       classes: classes.length,
       learners: classes.reduce((n, c) => n + c.learner_count, 0),

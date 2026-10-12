@@ -16,8 +16,8 @@ export const SUPPORT_THRESHOLD = 50;
 // GET /api/school-admin/reports/performance?year=&grade=&term=
 export const getPerformance = async (req, res) => {
   const schoolId = req.user.schoolId;
-  const years = await ClassModel.years(schoolId);
-  const year = Number(req.query.year) || years[0] || new Date().getFullYear();
+  const [years, currentYear] = await Promise.all([ClassModel.years(schoolId), ClassModel.currentYear(schoolId)]);
+  const year = Number(req.query.year) || currentYear;
 
   // Marks for this school's classes in the chosen year, optionally narrowed down.
   const values = [schoolId, year];

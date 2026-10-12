@@ -10,12 +10,11 @@ const duplicateName = (body) =>
   `There is already a class called ${body.class_name?.trim()} in ${body.academic_year ?? 'that year'}`;
 
 // GET /api/school-admin/classes?year=&grade=&status=active|inactive|all
-// Without a year, shows this calendar year (or the latest year that has classes).
+// Without a year, shows the school's current year (the newest year with active classes).
 export const listClasses = async (req, res) => {
   const schoolId = req.user.schoolId;
-  const years = await ClassModel.years(schoolId);
-  const thisYear = new Date().getFullYear();
-  const year = Number(req.query.year) || (years.includes(thisYear) || years.length === 0 ? thisYear : years[0]);
+  const [years, thisYear] = await Promise.all([ClassModel.years(schoolId), ClassModel.currentYear(schoolId)]);
+  const year = Number(req.query.year) || thisYear;
 
   const classes = await ClassModel.listForSchool(schoolId, {
     year,

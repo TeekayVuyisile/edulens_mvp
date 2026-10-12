@@ -10,6 +10,8 @@ import * as teachers from '../controllers/schoolAdmin/teachersController.js';
 import * as learners from '../controllers/schoolAdmin/learnersController.js';
 import * as classes from '../controllers/schoolAdmin/classesController.js';
 import { getPerformance } from '../controllers/schoolAdmin/reportsController.js';
+import * as yearEnd from '../controllers/schoolAdmin/yearEndController.js';
+import { OUTCOMES } from '../services/yearEnd.js';
 
 const router = express.Router();
 
@@ -148,5 +150,24 @@ router.get('/reports/performance', validate([
   query('grade').optional().isIn(CLASS_GRADES),
   query('term').optional().isIn(['1', '2', '3', '4']),
 ]), getPerformance);
+
+// ---- Year end ---------------------------------------------------------------------
+
+const year = (field) => body(field).isInt({ min: 2000, max: 2100 }).withMessage('Enter a year such as 2026').toInt();
+
+router.get('/year-end', validate([query('year').optional().isInt({ min: 2000, max: 2100 })]), yearEnd.getYearEnd);
+
+router.post('/year-end/next-classes', validate([
+  year('from_year'),
+  body('copy_teachers').optional().isBoolean({ strict: true }),
+]), yearEnd.createNextYearClasses);
+
+router.post('/year-end/complete', validate([
+  year('from_year'),
+  body('decisions').isArray({ min: 1, max: 5000 }).withMessage('Send a decision for every learner'),
+  body('decisions.*.learner_id').isUUID().withMessage('Invalid learner id'),
+  body('decisions.*.outcome').isIn(OUTCOMES).withMessage(`Outcome must be one of ${OUTCOMES.join(', ')}`),
+  body('decisions.*.class_id').optional({ values: 'null' }).isUUID().withMessage('Invalid class id'),
+]), yearEnd.completeYear);
 
 export default router;

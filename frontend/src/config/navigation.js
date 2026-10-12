@@ -1,5 +1,6 @@
 import {
   LuBookOpen,
+  LuCalendarCheck,
   LuBuilding2,
   LuChartColumn,
   LuClipboardList,
@@ -41,6 +42,7 @@ export const NAVIGATION = {
         { to: '/school-admin/teachers', label: 'Teachers', icon: LuUserRoundCog },
         { to: '/school-admin/learners', label: 'Learners', icon: LuUsers },
         { to: '/school-admin/reports', label: 'Reports', icon: LuChartColumn },
+        { to: '/school-admin/year-end', label: 'Year end', icon: LuCalendarCheck },
       ],
     },
   ],
