@@ -4,7 +4,6 @@ import {
 } from 'react-bootstrap';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
-import Layout from '../../components/common/Layout';
 
 const Worksheets = () => {
   const [activeTab, setActiveTab] = useState('generate');
@@ -191,7 +190,7 @@ const Worksheets = () => {
   };
 
   return (
-    <Layout>
+    <>
       <div className="mb-4">
         <h1 className="h3 mb-2">Worksheets</h1>
         <p className="text-muted">Generate and manage practice worksheets for your learners</p>
@@ -591,7 +590,7 @@ const Worksheets = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </Layout>
+    </>
   );
 };
 

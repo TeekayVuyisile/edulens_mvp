@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import ClassModel from '../models/Class.js';
+import { classInSchool } from '../services/access.js';
 import { parse } from 'csv-parse/sync';
 import fs from 'fs';
 import xlsx from 'xlsx';
@@ -892,10 +893,10 @@ export const updateLearnerProgress = async (req, res) => {
       SELECT l.*, c.class_name, c.grade_level
       FROM learners l
       LEFT JOIN classes c ON l.current_class_id = c.class_id
-      WHERE l.learner_id = $1
+      WHERE l.learner_id = $1 AND l.school_id = $2
     `;
 
-    const learnerResult = await pool.query(learnerQuery, [learnerId]);
+    const learnerResult = await pool.query(learnerQuery, [learnerId, req.user.schoolId]);
     
     if (learnerResult.rows.length === 0) {
       return res.status(404).json({
@@ -911,6 +912,13 @@ export const updateLearnerProgress = async (req, res) => {
         return res.status(400).json({
           status: 'error',
           message: 'next_class_id is required for promotion'
+        });
+      }
+
+      if (!(await classInSchool(next_class_id, req.user.schoolId))) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Class not found'
         });
       }
 
@@ -2293,7 +2301,7 @@ export const changeTeacherPassword = async (req, res) => {
 
     // Update password
     await pool.query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+      `UPDATE users SET password_hash = $1, password_changed_at = date_trunc('second', CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
       [passwordHash, teacherId]
     );
 

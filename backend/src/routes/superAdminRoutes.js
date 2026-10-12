@@ -1,10 +1,12 @@
 import express from 'express';
 import { requireSuperAdmin } from '../middleware/authMiddleware.js';
 import * as superAdminController from '../controllers/superAdminController.js';
-import { validate } from '../middleware/validationMiddleware.js';
+import { validate, validateUuidParams } from '../middleware/validationMiddleware.js';
 import { body, param } from 'express-validator';
 
 const router = express.Router();
+
+validateUuidParams(router, ['assignmentId', 'curriculumId', 'schoolId', 'subjectId', 'topicId', 'userId']);
 
 // Apply super admin middleware to all routes
 router.use(requireSuperAdmin);
@@ -26,7 +28,6 @@ router.delete('/schools/:schoolId', superAdminController.deleteSchool);
 
 router.post('/schools/:schoolId/admin',
   validate([
-    param('schoolId').isUUID(),
     body('email').isEmail(),
     body('password').isLength({ min: 6 }),
     body('first_name').notEmpty(),
@@ -54,7 +55,6 @@ router.delete('/curricula/:curriculumId', superAdminController.deleteCurriculum)
 // Subject Management
 router.post('/curricula/:curriculumId/subjects',
   validate([
-    param('curriculumId').isUUID(),
     body('subject_name').notEmpty(),
     body('grade_level').isIn(['R', '1', '2', '3', 'R-3'])
   ]),
@@ -78,7 +78,6 @@ router.delete('/subjects/:subjectId',
 // Topic Management
 router.post('/subjects/:subjectId/topics',
   validate([
-    param('subjectId').isUUID(),
     body('topic_name').notEmpty()
   ]),
   superAdminController.addTopic
@@ -101,7 +100,6 @@ router.delete('/topics/:topicId',
 // School Curriculum Assignments
 router.post('/schools/:schoolId/curricula',
   validate([
-    param('schoolId').isUUID(),
     body('curriculum_id').isUUID(),
     body('grade_level').isIn(['R', '1', '2', '3', 'R-3']),
     body('academic_year').isInt({ min: 2000, max: 2100 })
@@ -132,7 +130,6 @@ router.get('/users/:userId', superAdminController.getUserById);
 
 router.put('/users/:userId',
   validate([
-    param('userId').isUUID(),
     body('first_name').optional().notEmpty(),
     body('last_name').optional().notEmpty(),
     body('phone').optional(),
@@ -145,7 +142,6 @@ router.patch('/users/:userId/toggle-active', superAdminController.toggleUserActi
 
 router.patch('/users/:userId/change-password',
   validate([
-    param('userId').isUUID(),
     body('new_password').isLength({ min: 6 })
   ]),
   superAdminController.changeUserPassword

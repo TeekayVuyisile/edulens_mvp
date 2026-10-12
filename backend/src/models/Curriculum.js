@@ -1,4 +1,8 @@
 import pool from '../config/database.js';
+import { buildUpdateSet } from '../db/sql.js';
+
+// Columns a caller may change through update(); everything else is ignored.
+const UPDATABLE_COLUMNS = ['curriculum_name', 'description', 'is_active'];
 
 class Curriculum {
   // Get all curricula
@@ -97,26 +101,16 @@ class Curriculum {
 
   // Update curriculum
   static async update(curriculumId, updateData) {
-    const fields = [];
-    const values = [];
-    let paramCount = 1;
+    const { setClause, values, nextParam: paramCount } = buildUpdateSet(updateData, UPDATABLE_COLUMNS);
 
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] !== undefined) {
-        fields.push(`${key} = $${paramCount}`);
-        values.push(updateData[key]);
-        paramCount++;
-      }
-    });
-
-    if (fields.length === 0) {
+    if (!setClause) {
       throw new Error('No fields to update');
     }
 
     values.push(curriculumId);
     const query = `
       UPDATE curricula 
-      SET ${fields.join(', ')}
+      SET ${setClause}
       WHERE curriculum_id = $${paramCount}
       RETURNING *
     `;

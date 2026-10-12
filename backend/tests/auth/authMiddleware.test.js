@@ -87,7 +87,45 @@ describe('protect() middleware', () => {
     expect(res.body.message).toMatch(/suspended/i);
   });
 
-  // Known bugs, fixed in Phase 1 (auth & security).
-  it.todo('GET /api/auth/profile returns the current user (route currently hangs)');
-  it.todo('POST /api/auth/register cannot be used to create privileged accounts');
+  it('signs a user out when an admin changes their password', async () => {
+    const admin = await createUser({ role: 'super_admin' });
+    const teacher = await createUser({ role: 'teacher' });
+    const teacherHeaders = authHeader(teacher);
+    // Make the existing token older than the change below.
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const change = await request(app)
+      .patch(`/api/super-admin/users/${teacher.user_id}/change-password`)
+      .set(authHeader(admin))
+      .send({ new_password: 'ChangedPass1', confirm_new_password: 'ChangedPass1' });
+    const res = await request(app).get('/api/auth/profile').set(teacherHeaders);
+
+    expect(change.status).toBe(200);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('route id validation', () => {
+  beforeEach(resetDb);
+
+  it('rejects a malformed id with 400 instead of a database error', async () => {
+    const admin = await createUser({ role: 'super_admin' });
+
+    const res = await request(app).get('/api/super-admin/schools/not-a-uuid').set(authHeader(admin));
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Invalid schoolId');
+  });
+
+  it('checks authentication before validating ids', async () => {
+    const res = await request(app).get('/api/super-admin/schools/not-a-uuid');
+
+    expect(res.status).toBe(401);
+  });
+
+  it('no longer exposes the unprotected /api/learner routes', async () => {
+    const res = await request(app).get('/api/learner/me/profile');
+
+    expect(res.status).toBe(404);
+  });
 });

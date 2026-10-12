@@ -2,6 +2,7 @@ import ClassModel from '../models/Class.js';
 import Assessment from '../models/Assessment.js';
 import Worksheet from '../models/Worksheet.js';
 import pool from '../config/database.js';
+import { learnersOutsideClass, teacherTeachesLearner } from '../services/access.js';
 import fs from 'fs';
 import { parse } from 'csv-parse/sync';
 import xlsx from 'xlsx';
@@ -910,6 +911,27 @@ export const bulkGradeAssessment = async (req, res) => {
       });
     }
 
+    // Same ownership rule as the gradebook: only the assessment's teacher may grade it.
+    const assessment = await Assessment.getById(assessmentId);
+    if (!assessment || assessment.teacher_id !== req.user.userId) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Assessment not found'
+      });
+    }
+
+    const outsideClass = await learnersOutsideClass(
+      grades.map((g) => g.learner_id),
+      assessment.class_id
+    );
+    if (outsideClass.length > 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Some learners are not in this assessment\'s class',
+        data: { learner_ids: outsideClass }
+      });
+    }
+
     const result = await Assessment.bulkGrade(assessmentId, grades, req.user.userId);
 
     res.status(200).json({
@@ -1018,7 +1040,14 @@ export const getWorksheetHistory = async (req, res) => {
 export const getLearnerProfile = async (req, res) => {
   try {
     const { learnerId } = req.params;
-    
+
+    if (!(await teacherTeachesLearner(req.user.userId, learnerId))) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Learner not found'
+      });
+    }
+
     // Get learner details
     const learnerQuery = `
       SELECT 

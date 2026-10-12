@@ -57,6 +57,68 @@ export const createUser = async (overrides = {}) => {
   return { ...rows[0], password };
 };
 
+export const createClass = async ({ school_id, ...overrides } = {}) => {
+  const n = next();
+  const schoolId = school_id ?? (await createSchool()).school_id;
+  const { rows } = await pool.query(
+    `INSERT INTO classes (school_id, class_name, grade_level, academic_year, max_capacity)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      schoolId,
+      overrides.class_name ?? `Class ${n}`,
+      overrides.grade_level ?? '1',
+      overrides.academic_year ?? new Date().getFullYear(),
+      overrides.max_capacity ?? 30,
+    ]
+  );
+  return rows[0];
+};
+
+export const assignTeacher = async (teacher, klass, { is_primary = true } = {}) => {
+  await pool.query(
+    'INSERT INTO class_teacher_assignments (class_id, teacher_id, is_primary) VALUES ($1, $2, $3)',
+    [klass.class_id, teacher.user_id, is_primary]
+  );
+};
+
+/** Learners currently need a backing `users` row (role 'learner'); see Phase 3. */
+export const createLearner = async ({ klass, school_id, ...overrides } = {}) => {
+  const schoolId = school_id ?? klass?.school_id ?? (await createSchool()).school_id;
+  const user = await createUser({ role: 'learner', school_id: schoolId });
+  const { rows } = await pool.query(
+    `INSERT INTO learners (user_id, school_id, current_class_id, date_of_birth, gender)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      user.user_id,
+      schoolId,
+      klass?.class_id ?? null,
+      overrides.date_of_birth ?? '2019-03-01',
+      overrides.gender ?? 'female',
+    ]
+  );
+  return { ...rows[0], user };
+};
+
+export const createAssessment = async ({ teacher, klass, ...overrides }) => {
+  const n = next();
+  const { rows } = await pool.query(
+    `INSERT INTO assessments (class_id, teacher_id, assessment_name, assessment_type, total_marks, term_number)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [
+      klass.class_id,
+      teacher.user_id,
+      overrides.assessment_name ?? `Assessment ${n}`,
+      overrides.assessment_type ?? 'test',
+      overrides.total_marks ?? 20,
+      overrides.term_number ?? '1',
+    ]
+  );
+  return rows[0];
+};
+
 /** A valid JWT for `user`, signed the same way the login endpoint signs it. */
 export const tokenFor = (user) => User.generateToken(user);
 

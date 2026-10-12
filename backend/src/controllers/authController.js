@@ -1,63 +1,13 @@
+import crypto from 'crypto';
 import User from '../models/User.js';
 import emailService from '../services/emailService.js';
-import crypto from 'crypto';
 
-// @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public
-export const register = async (req, res) => {
-  try {
-    const { email, password, first_name, last_name, role, school_id } = req.body;
+// Roles that may sign in. Learner records still carry legacy user rows, but
+// learners never sign in (guardians will get their own portal).
+const SIGN_IN_ROLES = ['super_admin', 'school_admin', 'teacher'];
 
-    // Check if user already exists
-    const existingUser = await User.findByEmail(email);
-    if (existingUser) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'User with this email already exists'
-      });
-    }
-
-    // Create user
-    const user = await User.create({
-      email,
-      password,
-      first_name,
-      last_name,
-      role,
-      school_id
-    });
-
-    // Generate token
-    const token = User.generateToken(user);
-
-    // Send welcome email
-    await emailService.sendWelcomeEmail(email, first_name, role);
-
-    res.status(201).json({
-      status: 'success',
-      message: 'User registered successfully',
-      data: {
-        user: {
-          id: user.user_id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          role: user.role,
-          school_id: user.school_id
-        },
-        token
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-};
+const RESET_REQUESTED_MESSAGE =
+  'If an account exists with this email, you will receive a password reset link';
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -66,17 +16,24 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
     const user = await User.findByEmail(email);
-    
-    if (!user) {
+
+    // Same response for unknown email and wrong password, so the endpoint
+    // can't be used to discover which emails have accounts.
+    if (!user || !(await User.comparePassword(password, user.password_hash))) {
       return res.status(401).json({
         status: 'error',
         message: 'Invalid credentials'
       });
     }
 
-    // Check if user is active
+    if (!SIGN_IN_ROLES.includes(user.role)) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'This account cannot sign in'
+      });
+    }
+
     if (!user.is_active) {
       return res.status(401).json({
         status: 'error',
@@ -84,22 +41,9 @@ export const login = async (req, res) => {
       });
     }
 
-    // Verify password
-    const isPasswordValid = await User.comparePassword(password, user.password_hash);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Update last login
     await User.updateLastLogin(user.user_id);
 
-    // Generate token
     const token = User.generateToken(user);
-
-    // Remove password hash from response
     const { password_hash: _passwordHash, ...userWithoutPassword } = user;
 
     res.status(200).json({
@@ -114,13 +58,12 @@ export const login = async (req, res) => {
     console.error('Login error:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Login failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Login failed'
     });
   }
 };
 
-// @desc    Forgot password
+// @desc    Request a password reset email
 // @route   POST /api/auth/forgot-password
 // @access  Public
 export const forgotPassword = async (req, res) => {
@@ -128,26 +71,22 @@ export const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     const user = await User.findByEmail(email);
-    if (!user) {
-      // Don't reveal that user doesn't exist for security
-      return res.status(200).json({
-        status: 'success',
-        message: 'If an account exists with this email, you will receive a password reset link'
-      });
+
+    if (user && user.is_active && SIGN_IN_ROLES.includes(user.role)) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      await User.setPasswordResetToken(user.user_id, resetToken);
+
+      try {
+        await emailService.sendPasswordResetEmail(user.email, resetToken);
+      } catch (emailError) {
+        // Logged, not returned: the response must look the same either way.
+        console.error('Password reset email failed:', emailError);
+      }
     }
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-
-    // Save token to database
-    await User.setPasswordResetToken(email, resetToken);
-
-    // Send email
-    await emailService.sendPasswordResetEmail(email, resetToken);
 
     res.status(200).json({
       status: 'success',
-      message: 'Password reset link sent to your email'
+      message: RESET_REQUESTED_MESSAGE
     });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -158,22 +97,15 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
-// @desc    Reset password
+// @desc    Reset password with the emailed token
 // @route   POST /api/auth/reset-password
 // @access  Public
 export const resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
 
-    if (!token || !password) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Token and password are required'
-      });
-    }
-
     const user = await User.resetPassword(token, password);
-    
+
     if (!user) {
       return res.status(400).json({
         status: 'error',
@@ -194,15 +126,13 @@ export const resetPassword = async (req, res) => {
   }
 };
 
-// @desc    Get user profile
+// @desc    Get the signed-in user's profile
 // @route   GET /api/auth/profile
 // @access  Private
-// Also fix the getProfile function (line 202 error):
 export const getProfile = async (req, res) => {
   try {
-    // Use req.user.userId (from authMiddleware) not req.user.userId
     const user = await User.findById(req.user.userId);
-    
+
     if (!user) {
       return res.status(404).json({
         status: 'error',
@@ -223,17 +153,24 @@ export const getProfile = async (req, res) => {
   }
 };
 
-// @desc    Update user profile
+// @desc    Update the signed-in user's name and phone
 // @route   PUT /api/auth/profile
 // @access  Private
 export const updateProfile = async (req, res) => {
   try {
     const { first_name, last_name, phone } = req.body;
-    
+
     const updateData = {};
-    if (first_name) updateData.first_name = first_name;
-    if (last_name) updateData.last_name = last_name;
-    if (phone) updateData.phone = phone;
+    if (first_name !== undefined) updateData.first_name = first_name;
+    if (last_name !== undefined) updateData.last_name = last_name;
+    if (phone !== undefined) updateData.phone = phone || null;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No fields to update'
+      });
+    }
 
     const user = await User.update(req.user.userId, updateData);
 
@@ -254,18 +191,11 @@ export const updateProfile = async (req, res) => {
 // @desc    Logout user
 // @route   POST /api/auth/logout
 // @access  Private
-export const logout = async (req, res) => {
-  try {
-    // In a JWT system, client-side logout is primary.
-    // Server-side can handle session clearing if using cookies.
-    res.status(200).json({
-      status: 'success',
-      message: 'Logged out successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: 'Logout failed'
-    });
-  }
+// Tokens are stateless; the client discards its token. This endpoint exists so
+// the client has a single place to call (and for the activity log).
+export const logout = (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Logged out successfully'
+  });
 };

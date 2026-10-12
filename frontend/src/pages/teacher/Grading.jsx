@@ -6,7 +6,6 @@ import {
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import Layout from '../../components/common/Layout';
 import { FaEdit, FaEye, FaFileExport, FaChartLine, FaSync } from 'react-icons/fa';
 
 const Grading = () => {
@@ -261,7 +260,7 @@ const Grading = () => {
   });
 
   return (
-    <Layout>
+    <>
       <Container fluid className="py-4">
         {/* Header */}
         <div className="d-flex justify-content-between align-items-center mb-4">
@@ -868,7 +867,7 @@ const Grading = () => {
           </Modal.Footer>
         </Modal>
       </Container>
-    </Layout>
+    </>
   );
 };
 

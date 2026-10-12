@@ -1,6 +1,7 @@
 import School from '../models/School.js';
 import Curriculum from '../models/Curriculum.js';
 import User from '../models/User.js';
+import { buildUpdateSet } from '../db/sql.js';
 
 // @desc    Create a new school
 // @route   POST /api/super-admin/schools
@@ -1151,33 +1152,24 @@ export const updateUser = async (req, res) => {
       }
     }
 
-    // Build update query
-    const fields = [];
-    const values = [];
-    let paramCount = 1;
+    // Build update query (role, password and status have their own endpoints)
+    const { setClause, values, nextParam } = buildUpdateSet(updateData, [
+      'first_name', 'last_name', 'email', 'phone', 'school_id',
+    ]);
 
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] !== undefined) {
-        fields.push(`${key} = $${paramCount}`);
-        values.push(updateData[key]);
-        paramCount++;
-      }
-    });
-
-    if (fields.length === 0) {
+    if (!setClause) {
       return res.status(400).json({
         status: 'error',
         message: 'No fields to update'
       });
     }
 
-    fields.push('updated_at = CURRENT_TIMESTAMP');
     values.push(userId);
 
     const query = `
-      UPDATE users 
-      SET ${fields.join(', ')}
-      WHERE user_id = $${paramCount}
+      UPDATE users
+      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $${nextParam}
       RETURNING user_id, email, first_name, last_name, role, phone, school_id, is_active, last_login, created_at, updated_at
     `;
 
@@ -1319,7 +1311,7 @@ export const changeUserPassword = async (req, res) => {
 
     // Update password
     await pool.query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+      `UPDATE users SET password_hash = $1, password_changed_at = date_trunc('second', CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
       [hashedPassword, userId]
     );
 

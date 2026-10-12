@@ -1,4 +1,11 @@
 import pool from '../config/database.js';
+import { buildUpdateSet } from '../db/sql.js';
+
+// Columns a caller may change through update(); everything else is ignored.
+const UPDATABLE_COLUMNS = [
+  'assessment_name', 'assessment_type', 'description', 'total_marks', 'passing_marks',
+  'term_number', 'due_date', 'scheduled_date', 'curriculum_id', 'subject_id', 'topic_id',
+];
 
 class Assessment {
   // Create a new assessment
@@ -212,8 +219,10 @@ class Assessment {
 
   // Update assessment
   static async update(assessmentId, updateData) {
-    const fields = Object.keys(updateData);
-    const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
+    const { setClause, values } = buildUpdateSet(updateData, UPDATABLE_COLUMNS, 2);
+    if (!setClause) {
+      throw new Error('No fields to update');
+    }
     
     const query = `
       UPDATE assessments
@@ -222,8 +231,7 @@ class Assessment {
       RETURNING *
     `;
 
-    const values = [assessmentId, ...fields.map(field => updateData[field])];
-    const result = await pool.query(query, values);
+    const result = await pool.query(query, [assessmentId, ...values]);
     return result.rows[0];
   }
 

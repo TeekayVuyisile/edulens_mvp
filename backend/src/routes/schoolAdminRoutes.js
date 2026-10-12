@@ -1,11 +1,13 @@
 import express from 'express';
 import { requireSchoolAdmin } from '../middleware/authMiddleware.js';
 import * as schoolAdminController from '../controllers/schoolAdminController.js';
-import { validate } from '../middleware/validationMiddleware.js';
+import { validate, validateUuidParams } from '../middleware/validationMiddleware.js';
 import { body, param } from 'express-validator';
 import multer from 'multer';
 
 const router = express.Router();
+
+validateUuidParams(router, ['classId', 'learnerId', 'teacherId']);
 const upload = multer({ dest: 'uploads/' });
 
 // Apply school admin middleware to all routes
@@ -50,7 +52,6 @@ router.post('/learners',
 );
 // Add this route with other learner routes
 router.get('/learners/:learnerId',
-  param('learnerId').isUUID(),
   schoolAdminController.getLearnerById
 );
 
@@ -78,7 +79,6 @@ router.put('/classes/:classId', schoolAdminController.updateClass);
 
 // Academic Progress
 router.post('/learners/:learnerId/progress',
-  param('learnerId').isUUID(),
   validate([
     body('action').isIn(['promote', 'repeat']),
     body('next_class_id').optional().isUUID()
@@ -98,7 +98,6 @@ router.get('/reports/worksheets',
 
 // Teacher assignments
 router.post('/classes/:classId/assign-teacher',
-  param('classId').isUUID(),
   validate([
     body('teacher_id').isUUID(),
     body('is_primary').optional().isBoolean()
@@ -107,8 +106,6 @@ router.post('/classes/:classId/assign-teacher',
 );
 
 router.delete('/classes/:classId/teachers/:teacherId',
-  param('classId').isUUID(),
-  param('teacherId').isUUID(),
   schoolAdminController.removeTeacherFromClass
 );
 
@@ -132,7 +129,6 @@ router.post('/academic-years/:year/archive',
 
 // Learner assignment routes
 router.post('/classes/:classId/assign-learner',
-  param('classId').isUUID(),
   validate([
     body('learner_id').isUUID()
   ]),
@@ -140,19 +136,15 @@ router.post('/classes/:classId/assign-learner',
 );
 
 router.delete('/classes/:classId/learners/:learnerId',
-  param('classId').isUUID(),
-  param('learnerId').isUUID(),
   schoolAdminController.removeLearnerFromClass
 );
 
 router.get('/classes/:classId/available-learners',
-  param('classId').isUUID(),
   schoolAdminController.getAvailableLearners
 );
 
 // Class status toggle route
 router.patch('/classes/:classId/toggle-status',
-  param('classId').isUUID(),
   validate([
     body('is_active').isBoolean()
   ]),
@@ -160,12 +152,10 @@ router.patch('/classes/:classId/toggle-status',
 );               
 // Teacher management routes
 router.get('/teachers/:teacherId',
-  param('teacherId').isUUID(),
   schoolAdminController.getTeacherById
 );
 
 router.put('/teachers/:teacherId',
-  param('teacherId').isUUID(),
   validate([
     body('email').optional().isEmail(),
     body('first_name').optional().notEmpty(),
@@ -177,7 +167,6 @@ router.put('/teachers/:teacherId',
 );
 
 router.patch('/teachers/:teacherId/password',
-  param('teacherId').isUUID(),
   validate([
     body('new_password').isLength({ min: 6 })
   ]),
@@ -185,7 +174,6 @@ router.patch('/teachers/:teacherId/password',
 );
 
 router.patch('/teachers/:teacherId/toggle-active',
-  param('teacherId').isUUID(),
   validate([
     body('is_active').isBoolean()
   ]),
@@ -193,17 +181,14 @@ router.patch('/teachers/:teacherId/toggle-active',
 );
 
 router.get('/teachers/:teacherId/classes',
-  param('teacherId').isUUID(),
   schoolAdminController.getTeacherClasses
 );
 // Learner management routes
 router.get('/learners/:learnerId/performance',
-  param('learnerId').isUUID(),
   schoolAdminController.getLearnerPerformance
 );
 
 router.put('/learners/:learnerId',
-  param('learnerId').isUUID(),
   validate([
     body('first_name').notEmpty(),
     body('last_name').notEmpty(),
@@ -214,7 +199,6 @@ router.put('/learners/:learnerId',
 );
 
 router.patch('/learners/:learnerId/status',
-  param('learnerId').isUUID(),
   validate([
     body('academic_status').isIn(['active', 'archived', 'graduated', 'repeated', 'inactive'])
   ]),

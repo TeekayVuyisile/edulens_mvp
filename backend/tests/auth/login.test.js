@@ -64,6 +64,40 @@ describe('POST /api/auth/login', () => {
     expect(res.body.message).toMatch(/deactivated/i);
   });
 
+  it('does not reveal that an account is deactivated without the right password', async () => {
+    const user = await createUser({ is_active: false });
+
+    const res = await login({ email: user.email, password: 'wrong-password' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe('Invalid credentials');
+  });
+
+  it('accepts Gmail addresses containing dots', async () => {
+    const user = await createUser({ email: 'first.last@gmail.com' });
+
+    const res = await login({ email: 'first.last@gmail.com', password: user.password });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('matches emails case-insensitively and ignores surrounding spaces', async () => {
+    const user = await createUser({ email: 'Mixed.Case@Example.com' });
+
+    const res = await login({ email: '  mixed.case@example.COM ', password: user.password });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('refuses legacy learner accounts', async () => {
+    const learner = await createUser({ role: 'learner', password: 'learner123' });
+
+    const res = await login({ email: learner.email, password: 'learner123' });
+
+    expect(res.status).toBe(403);
+    expect(res.body).not.toHaveProperty('data');
+  });
+
   it('validates the request body', async () => {
     const res = await login({ email: 'not-an-email' });
 
@@ -73,7 +107,18 @@ describe('POST /api/auth/login', () => {
       expect.arrayContaining(['email', 'password'])
     );
   });
+});
 
-  // Known bugs, fixed in Phase 1 (auth & security).
-  it.todo('accepts Gmail addresses containing dots (normalizeEmail currently strips them)');
+describe('POST /api/auth/register', () => {
+  it('no longer exists (accounts are created by admins)', async () => {
+    const res = await request(app).post('/api/auth/register').send({
+      email: 'attacker@example.com',
+      password: 'Password123!',
+      first_name: 'A',
+      last_name: 'B',
+      role: 'super_admin',
+    });
+
+    expect(res.status).toBe(404);
+  });
 });

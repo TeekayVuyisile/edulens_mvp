@@ -1,6 +1,11 @@
 import pool from '../config/database.js';
+import { buildUpdateSet } from '../db/sql.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+
+// Columns a caller may change through update(); everything else is ignored.
+const PROFILE_COLUMNS = ['first_name', 'last_name', 'phone', 'profile_image_url'];
 
 class User {
   // Create a new user
@@ -60,8 +65,8 @@ class User {
         user_id, email, password_hash, first_name, last_name, 
         role, school_id, phone, profile_image_url, is_active,
         last_login, created_at
-      FROM users 
-      WHERE email = $1
+      FROM users
+      WHERE LOWER(email) = LOWER($1)
     `;
 
     try {
@@ -95,26 +100,16 @@ class User {
 
   // Update user
   static async update(userId, updateData) {
-    const fields = [];
-    const values = [];
-    let paramCount = 1;
+    const { setClause, values, nextParam: paramCount } = buildUpdateSet(updateData, PROFILE_COLUMNS);
 
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] !== undefined) {
-        fields.push(`${key} = $${paramCount}`);
-        values.push(updateData[key]);
-        paramCount++;
-      }
-    });
-
-    if (fields.length === 0) {
+    if (!setClause) {
       throw new Error('No fields to update');
     }
 
     values.push(userId);
     const query = `
       UPDATE users 
-      SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = $${paramCount}
       RETURNING 
         user_id, email, first_name, last_name, role, 
@@ -165,47 +160,52 @@ class User {
     }
   }
 
-  // Set password reset token
-  static async setPasswordResetToken(email, token) {
-    const expires = new Date();
-    expires.setHours(expires.getHours() + 1); // Token expires in 1 hour
+  // Only a SHA-256 hash of the reset token is stored, so a database leak
+  // doesn't expose usable reset links.
+  static hashResetToken(token) {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
 
+  // Set password reset token (valid for 1 hour)
+  static async setPasswordResetToken(userId, token) {
     const query = `
-      UPDATE users 
-      SET 
+      UPDATE users
+      SET
         password_reset_token = $1,
-        password_reset_expires = $2
-      WHERE email = $3
+        password_reset_expires = CURRENT_TIMESTAMP + INTERVAL '1 hour'
+      WHERE user_id = $2
     `;
 
     try {
-      await pool.query(query, [token, expires, email]);
+      await pool.query(query, [User.hashResetToken(token), userId]);
     } catch (error) {
       console.error('Error setting password reset token:', error);
       throw error;
     }
   }
 
-  // Reset password
+  // Reset password; signs the user out of existing sessions via password_changed_at
   static async resetPassword(token, newPassword) {
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(newPassword, salt);
 
     const query = `
-      UPDATE users 
-      SET 
+      UPDATE users
+      SET
         password_hash = $1,
         password_reset_token = NULL,
         password_reset_expires = NULL,
+        password_changed_at = date_trunc('second', CURRENT_TIMESTAMP),
         updated_at = CURRENT_TIMESTAMP
-      WHERE password_reset_token = $2 
+      WHERE password_reset_token = $2
         AND password_reset_expires > CURRENT_TIMESTAMP
+        AND is_active = true
       RETURNING user_id, email
     `;
 
     try {
-      const result = await pool.query(query, [passwordHash, token]);
+      const result = await pool.query(query, [passwordHash, User.hashResetToken(token)]);
       return result.rows[0];
     } catch (error) {
       console.error('Error resetting password:', error);
