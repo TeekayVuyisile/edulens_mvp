@@ -1,0 +1,40 @@
+# Render blueprint: one web service runs the API and serves the built React app.
+# The database is Neon (Postgres 17); paste its connection string as DATABASE_URL.
+# Settings marked `sync: false` are entered in the Render dashboard when the
+# blueprint is created (they are secrets, so they're never stored in this file).
+
+services:
+  - type: web
+    name: edulens-lms
+    runtime: node
+    plan: free
+    region: frankfurt # closest Render region to South Africa; create the Neon project in AWS Frankfurt too
+    branch: master
+    buildCommand: npm ci --prefix backend && npm ci --prefix frontend --include=dev && npm run build --prefix frontend
+    # Applies new migrations, optionally creates the demo school, then starts the API.
+    startCommand: npm run start:render --prefix backend
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL # Neon connection string, ending in ?sslmode=require
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRE
+        value: 7d
+      - key: FRONTEND_URL # this service's own URL, e.g. https://edulens-lms.onrender.com
+        sync: false
+      - key: SUPER_ADMIN_EMAIL # the first super admin, created on first start
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_DEMO # "true" creates Sunflower Primary (Demo) once, for portfolio visitors
+        value: "true"
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY # optional: AI worksheets stay "not set up" without it
+        sync: false
