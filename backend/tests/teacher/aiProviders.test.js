@@ -83,36 +83,63 @@ describe('choosing the provider', () => {
     expect(isConfigured()).toBe(false);
     process.env.GROQ_API_KEY = 'gsk_abcdefghijk';
     expect(isConfigured()).toBe(true);
-    expect(aiDescription()).toEqual({ provider: 'Groq', model: 'llama-3.3-70b-versatile' });
+    expect(aiDescription()).toEqual({ provider: 'Groq', model: 'openai/gpt-oss-20b' });
   });
 });
 
 describe('generating through Groq', () => {
-  it('sends JSON mode with the schema in the prompt, and reads the reply', async () => {
+  it('uses gpt-oss-20b with a strict JSON schema by default', async () => {
     useGroq();
 
     const result = await generateWorksheet(request);
 
     expect(result.worksheet.title).toBe('Counting');
-    expect(result.model).toBe('groq/llama-3.3-70b-versatile');
+    expect(result.model).toBe('groq/openai/gpt-oss-20b');
     expect(result.usage).toEqual({ prompt_tokens: 10, completion_tokens: 5 });
     const [sent] = received;
     expect(sent.url).toBe('/openai/v1/chat/completions');
     expect(sent.auth).toBe('Bearer gsk_test_not_a_real_key');
-    expect(sent.body.response_format).toEqual({ type: 'json_object' });
-    expect(sent.body.messages[0].content).toContain('Reply with one JSON object only');
-    expect(sent.body.messages[0].content).toContain('"teacher_notes"');
+    expect(sent.body.model).toBe('openai/gpt-oss-20b');
+    expect(sent.body.response_format).toMatchObject({ type: 'json_schema', json_schema: { strict: true } });
   });
 
-  it('can use strict structured output for models that support it', async () => {
+  it('uses JSON mode with the schema in the prompt for models without strict schemas', async () => {
     useGroq();
-    process.env.AI_STRUCTURED_OUTPUT = 'true';
-    process.env.GROQ_MODEL = 'openai/gpt-oss-20b';
+    process.env.GROQ_MODEL = 'llama-3.1-8b-instant';
 
     await generateWorksheet(request);
 
-    expect(received[0].body.model).toBe('openai/gpt-oss-20b');
-    expect(received[0].body.response_format.type).toBe('json_schema');
+    expect(received[0].body.model).toBe('llama-3.1-8b-instant');
+    expect(received[0].body.response_format).toEqual({ type: 'json_object' });
+    expect(received[0].body.messages[0].content).toContain('Reply with one JSON object only');
+    expect(received[0].body.messages[0].content).toContain('"teacher_notes"');
+  });
+
+  it('moves on to the next model when one is not available to the account', async () => {
+    useGroq();
+    process.env.GROQ_MODEL = 'llama-3.3-70b-versatile';
+    reply = () =>
+      received.at(-1).body.model === 'llama-3.3-70b-versatile'
+        ? { status: 404, error: { message: 'The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.', code: 'model_not_found' } }
+        : { status: 200, content: JSON.stringify(WORKSHEET) };
+
+    const result = await generateWorksheet(request);
+
+    expect(received.map((r) => r.body.model)).toEqual(['llama-3.3-70b-versatile', 'openai/gpt-oss-20b']);
+    expect(result.model).toBe('groq/openai/gpt-oss-20b');
+  });
+
+  it('falls back to JSON mode when the strict schema is refused', async () => {
+    useGroq();
+    reply = () =>
+      received.at(-1).body.response_format.type === 'json_schema'
+        ? { status: 400, error: { message: 'invalid JSON schema for response_format', type: 'invalid_request_error' } }
+        : { status: 200, content: JSON.stringify(WORKSHEET) };
+
+    const result = await generateWorksheet(request);
+
+    expect(received.map((r) => r.body.response_format.type)).toEqual(['json_schema', 'json_object']);
+    expect(result.worksheet.title).toBe('Counting');
   });
 
   it('accepts JSON wrapped in markdown fences, and retries once after an invalid reply', async () => {
@@ -134,7 +161,8 @@ describe('generating through Groq', () => {
     reply = () => ({ status: 401, error: { message: 'Invalid API Key', type: 'invalid_request_error' } });
     await expect(generateWorksheet(request)).rejects.toBeInstanceOf(AiNotConfiguredError);
 
-    reply = () => ({ status: 404, error: { message: 'The model `old` does not exist', code: 'model_not_found' } });
+    // Every model unavailable: a setup error naming the setting to change.
+    reply = () => ({ status: 404, error: { message: 'The model does not exist', code: 'model_not_found' } });
     await expect(generateWorksheet(request)).rejects.toThrow(/set GROQ_MODEL/);
   });
 });

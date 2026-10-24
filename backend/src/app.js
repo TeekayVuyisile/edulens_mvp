@@ -113,7 +113,7 @@ if (serveFrontend) {
   );
   // Client-side routes (/dashboard, /teacher/…) all load index.html; it's never cached so deploys show up at once.
   app.use((req, res, next) => {
-    if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+    if (!['GET', 'HEAD'].includes(req.method) || req.path.startsWith('/api/')) return next();
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
   });
