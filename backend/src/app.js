@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -17,6 +20,17 @@ import parentRoutes from './routes/parentRoutes.js';
 
 const app = express();
 const isTest = process.env.NODE_ENV === 'test';
+
+// Behind Render's (or any) load balancer: use the client's IP from X-Forwarded-For,
+// so rate limits apply per visitor rather than to the proxy. One hop only.
+if (process.env.TRUST_PROXY !== 'false') app.set('trust proxy', 1);
+
+// The built React app (frontend/dist). When it exists (production build), the API
+// serves it too, so the whole app runs as one service on one URL.
+const FRONTEND_DIST = process.env.FRONTEND_DIST
+  ? path.resolve(process.env.FRONTEND_DIST)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
+const serveFrontend = !isTest && fs.existsSync(path.join(FRONTEND_DIST, 'index.html'));
 
 // Rate limiting (disabled under test so suites can make many requests)
 const limiter = rateLimit({
@@ -86,6 +100,24 @@ app.use('/api/school-admin', schoolAdminRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/curriculum', curriculumRoutes);
 app.use('/api/parent', parentRoutes);
+
+if (serveFrontend) {
+  // Hashed files under /assets never change, so they can be cached for a year.
+  app.use(
+    express.static(FRONTEND_DIST, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      },
+    })
+  );
+  // Client-side routes (/dashboard, /teacher/…) all load index.html; it's never cached so deploys show up at once.
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+  });
+}
 
 // 404 handler
 app.use((req, res) => {

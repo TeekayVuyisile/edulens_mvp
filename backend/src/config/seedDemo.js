@@ -11,8 +11,9 @@ import Learner from '../models/Learner.js';
 //
 //   npm run seed:demo           creates it (does nothing if it already exists)
 //   npm run seed:demo -- --reset  deletes the demo school and creates it again
+//   node src/config/seedDemo.js --if-enabled   only when SEED_DEMO=true (used at start-up on Render)
 //
-// Refuses to run when NODE_ENV=production unless DEMO_SEED_ALLOW=true.
+// Refuses to run when NODE_ENV=production unless SEED_DEMO=true or DEMO_SEED_ALLOW=true.
 
 export const DEMO_PASSWORD = 'Demo123!';
 export const DEMO_SCHOOL_CODE = 'DEMO01';
@@ -94,8 +95,9 @@ const ensureCurriculum = async (client) => {
 };
 
 export const seedDemo = async ({ reset = false } = {}) => {
-  if (process.env.NODE_ENV === 'production' && process.env.DEMO_SEED_ALLOW !== 'true') {
-    throw new Error('Refusing to add demo data in production (set DEMO_SEED_ALLOW=true to override).');
+  const allowed = process.env.DEMO_SEED_ALLOW === 'true' || process.env.SEED_DEMO === 'true';
+  if (process.env.NODE_ENV === 'production' && !allowed) {
+    throw new Error('Refusing to add demo data in production (set SEED_DEMO=true to allow it).');
   }
 
   const existing = await pool.query('SELECT school_id FROM schools WHERE school_code = $1', [DEMO_SCHOOL_CODE]);
@@ -241,10 +243,19 @@ export const seedDemo = async ({ reset = false } = {}) => {
 const printAccounts = () => {
   console.log('\nDemo school: Sunflower Primary (Demo). Every demo account uses the password', DEMO_PASSWORD);
   for (const a of DEMO_ACCOUNTS) console.log(`  ${a.role.padEnd(13)} ${a.email}`);
-  console.log('  super_admin   superadmin@edulens.com (created by npm run migrate; Admin123! in development)\n');
+  console.log(
+    process.env.SUPER_ADMIN_EMAIL
+      ? `  super_admin   ${process.env.SUPER_ADMIN_EMAIL} (password from SUPER_ADMIN_PASSWORD)\n`
+      : '  super_admin   superadmin@edulens.com (development only: Admin123!)\n'
+  );
 };
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+const skipped = process.argv.includes('--if-enabled') && process.env.SEED_DEMO !== 'true';
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href && skipped) {
+  console.log('Demo data: skipped (set SEED_DEMO=true to create the demo school).');
+  await pool.end();
+} else if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   seedDemo({ reset: process.argv.includes('--reset') })
     .then(({ created }) => {
       console.log(created ? '✓ Demo data created.' : 'Demo data already exists (use --reset to recreate it).');
