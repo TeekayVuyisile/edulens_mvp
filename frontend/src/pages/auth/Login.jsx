@@ -3,6 +3,7 @@ import { Button, Form, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import AuthLayout from '../../components/auth/AuthLayout';
+import DemoSignIn from '../../components/auth/DemoSignIn';
 import FormAlert from '../../components/ui/FormAlert';
 import PasswordField from '../../components/ui/PasswordField';
 
@@ -38,6 +39,8 @@ const Login = () => {
     >
       <FormAlert variant="info">{!error && notice}</FormAlert>
       <FormAlert variant="danger">{error}</FormAlert>
+
+      <DemoSignIn onError={setError} />
 
       <Form onSubmit={handleSubmit} noValidate={false}>
         <Form.Group className="mb-3" controlId="login-email">

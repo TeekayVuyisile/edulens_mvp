@@ -6,6 +6,7 @@ import { LuPanelLeftClose, LuPanelLeftOpen } from 'react-icons/lu';
 import { useAuth } from '../../contexts/useAuth';
 import { pageTransition } from '../../lib/motion';
 import BrandMark from '../ui/BrandMark';
+import DemoBanner from './DemoBanner';
 import SidebarNav from './SidebarNav';
 import Topbar from './Topbar';
 
@@ -72,6 +73,7 @@ const AppShell = () => {
 
       <div className="el-main">
         <Topbar onOpenMenu={() => setMenuOpen(true)} />
+        <DemoBanner />
         <main id="main-content" className="el-content" tabIndex={-1}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={location.pathname} {...pageTransition}>

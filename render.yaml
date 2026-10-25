@@ -34,6 +34,8 @@ services:
         sync: false
       - key: SEED_DEMO # "true" creates Sunflower Primary (Demo) once, for portfolio visitors
         value: "true"
+      - key: DEMO_LOGIN # "true" shows one-click demo sign-in buttons on the login page
+        value: "true"
       - key: AI_PROVIDER
         value: groq
       - key: GROQ_API_KEY # optional: AI worksheets stay "not set up" without it
