@@ -68,6 +68,20 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // One-click sign-in to a demo account (only offered when the server allows it).
+  const demoLogin = useCallback(async (account) => {
+    try {
+      const res = await http.post('/api/auth/demo-login', { account });
+      const { token, user: signedIn } = res.data.data;
+      tokenStore.set(token);
+      setUser(signedIn);
+      setNotice(null);
+      return { ok: true, user: signedIn };
+    } catch (error) {
+      return { ok: false, message: errorMessage(error, 'Couldn’t open the demo. Please try again.') };
+    }
+  }, []);
+
   const logout = useCallback(() => {
     // Fire and forget: signing out locally must never wait on the network.
     if (tokenStore.get()) http.post('/api/auth/logout').catch(() => {});
@@ -106,13 +120,14 @@ export const AuthProvider = ({ children }) => {
       notice,
       isAuthenticated: Boolean(user),
       login,
+      demoLogin,
       logout,
       forgotPassword,
       resetPassword,
       updateProfile,
       dismissNotice: () => setNotice(null),
     }),
-    [user, status, notice, login, logout, forgotPassword, resetPassword, updateProfile]
+    [user, status, notice, login, demoLogin, logout, forgotPassword, resetPassword, updateProfile]
   );
 
   return (

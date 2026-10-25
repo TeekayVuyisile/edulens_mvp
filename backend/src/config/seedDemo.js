@@ -5,6 +5,7 @@ import { withTransaction } from '../db/transaction.js';
 import Assessment from '../models/Assessment.js';
 import ClassModel from '../models/Class.js';
 import Learner from '../models/Learner.js';
+import { DEMO_ACCOUNTS, DEMO_SCHOOL_CODE } from '../services/demo.js';
 
 // Demo data for trying Edulens (and for portfolio reviewers): one school with a
 // login for every role, classes, learners, marks and a parent.
@@ -16,13 +17,7 @@ import Learner from '../models/Learner.js';
 // Refuses to run when NODE_ENV=production unless SEED_DEMO=true or DEMO_SEED_ALLOW=true.
 
 export const DEMO_PASSWORD = 'Demo123!';
-export const DEMO_SCHOOL_CODE = 'DEMO01';
-export const DEMO_ACCOUNTS = [
-  { email: 'demo.admin@example.com', first_name: 'Lindiwe', last_name: 'Mokoena', role: 'school_admin' },
-  { email: 'demo.teacher@example.com', first_name: 'Thandi', last_name: 'Nkosi', role: 'teacher' },
-  { email: 'demo.teacher2@example.com', first_name: 'Sipho', last_name: 'Ndlovu', role: 'teacher' },
-  { email: 'demo.parent@example.com', first_name: 'Zanele', last_name: 'Dlamini', role: 'parent' },
-];
+export { DEMO_ACCOUNTS, DEMO_SCHOOL_CODE };
 
 const SUBJECTS = {
   Mathematics: ['Counting and number', 'Addition and subtraction', 'Shapes and patterns', 'Measurement'],

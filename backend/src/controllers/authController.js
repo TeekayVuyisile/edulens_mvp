@@ -1,6 +1,10 @@
 import crypto from 'crypto';
 import User from '../models/User.js';
 import emailService from '../services/emailService.js';
+import pool from '../config/database.js';
+import { demoLoginEnabled, findDemoAccount, isDemoEmail, publicDemoAccounts } from '../services/demo.js';
+import { badRequest, HttpError, notFound } from '../utils/httpError.js';
+import { ok } from '../utils/respond.js';
 
 // Roles that may sign in.
 // Learners never sign in; their parents and guardians use the parent portal.
@@ -50,7 +54,7 @@ export const login = async (req, res) => {
       status: 'success',
       message: 'Login successful',
       data: {
-        user: userWithoutPassword,
+        user: { ...userWithoutPassword, is_demo: isDemoEmail(user.email) },
         token
       }
     });
@@ -61,6 +65,40 @@ export const login = async (req, res) => {
       message: 'Login failed'
     });
   }
+};
+
+// @desc    Which demo accounts the sign-in page can offer
+// @route   GET /api/auth/demo
+// @access  Public
+export const demoAccounts = (req, res) => {
+  const enabled = demoLoginEnabled();
+  ok(res, { enabled, accounts: enabled ? publicDemoAccounts() : [] });
+};
+
+// @desc    Sign in to a demo account without a password
+// @route   POST /api/auth/demo-login
+// @access  Public, only when DEMO_LOGIN=true
+export const demoLogin = async (req, res) => {
+  if (!demoLoginEnabled()) throw notFound('Demo sign-in isn’t available on this server');
+
+  const account = findDemoAccount(req.body.account);
+  if (!account) throw badRequest('Choose a demo account');
+
+  const user = await User.findByEmail(account.email);
+  if (!user) throw new HttpError(503, 'The demo school isn’t set up on this server yet');
+
+  // The demo is shared: if a visitor deactivated this account, bring it back.
+  if (!user.is_active) {
+    await pool.query('UPDATE users SET is_active = true WHERE user_id = $1', [user.user_id]);
+  }
+  await User.updateLastLogin(user.user_id);
+
+  const { password_hash: _passwordHash, ...userWithoutPassword } = user;
+  ok(
+    res,
+    { user: { ...userWithoutPassword, is_active: true, is_demo: true }, token: User.generateToken(user) },
+    `Signed in to the demo as ${user.first_name} ${user.last_name}`
+  );
 };
 
 // @desc    Request a password reset email
@@ -142,7 +180,7 @@ export const getProfile = async (req, res) => {
 
     res.status(200).json({
       status: 'success',
-      data: { user }
+      data: { user: { ...user, is_demo: isDemoEmail(user.email) } }
     });
   } catch (error) {
     console.error('Get profile error:', error);

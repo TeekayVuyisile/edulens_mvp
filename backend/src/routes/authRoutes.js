@@ -1,5 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
+import { body } from 'express-validator';
 import * as authController from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
@@ -29,6 +30,15 @@ const credentialLimiter = rateLimit({
 router.post('/login', credentialLimiter, validate(loginValidation), authController.login);
 router.post('/forgot-password', credentialLimiter, validate(forgotPasswordValidation), authController.forgotPassword);
 router.post('/reset-password', credentialLimiter, validate(resetPasswordValidation), authController.resetPassword);
+
+// One-click sign-in to the demo school's accounts (off unless DEMO_LOGIN=true).
+router.get('/demo', authController.demoAccounts);
+router.post(
+  '/demo-login',
+  credentialLimiter,
+  validate([body('account').isString().withMessage('Choose a demo account')]),
+  authController.demoLogin
+);
 
 // Any signed-in user
 router.get('/profile', protect(), authController.getProfile);
