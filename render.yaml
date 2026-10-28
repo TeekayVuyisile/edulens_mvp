@@ -1,4 +1,8 @@
-# Render blueprint: one web service runs the API and serves the built React app.
+# Render blueprint, all on free plans:
+#  - edulens-lms-app (static site): the app people visit. Served from Render's CDN and never
+#    sleeps, so it loads at once; it wakes the API in the background and explains the wait.
+#  - edulens-lms (web service): the API. Free instances sleep after 15 minutes and take up to a
+#    minute to wake. It still serves the built app on its own URL too.
 # The database is Neon (Postgres 17); paste its connection string as DATABASE_URL.
 # Settings marked `sync: false` are entered in the Render dashboard when the
 # blueprint is created (they are secrets, so they're never stored in this file).
@@ -26,7 +30,7 @@ services:
         generateValue: true
       - key: JWT_EXPIRE
         value: 7d
-      - key: FRONTEND_URL # this service's own URL, e.g. https://edulens-lms.onrender.com
+      - key: FRONTEND_URL # the static site's URL (CORS origin + email links): https://edulens-lms-app.onrender.com
         sync: false
       - key: SUPER_ADMIN_EMAIL # the first super admin, created on first start
         sync: false
@@ -40,3 +44,26 @@ services:
         value: groq
       - key: GROQ_API_KEY # optional: AI worksheets stay "not set up" without it
         sync: false
+
+  - type: web
+    name: edulens-lms-app
+    runtime: static
+    branch: master
+    buildCommand: npm ci --prefix frontend --include=dev && npm run build --prefix frontend
+    staticPublishPath: ./frontend/dist
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # The API's public URL, baked into the build (fromService only gives a private hostname).
+      - key: VITE_API_URL
+        value: https://edulens-lms.onrender.com
+    routes:
+      # Client-side routes (/dashboard, /teacher/…) all load index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

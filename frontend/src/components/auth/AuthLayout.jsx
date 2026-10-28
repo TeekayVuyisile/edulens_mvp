@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { LuChartLine, LuClipboardCheck, LuSparkles } from 'react-icons/lu';
 import BrandMark from '../ui/BrandMark';
+import ServerNotice from '../ui/ServerNotice';
 import { DURATION, EASE_OUT } from '../../lib/motion';
 
 const HIGHLIGHTS = [
@@ -43,6 +44,7 @@ const AuthLayout = ({ title, subtitle, children, footer }) => (
         <BrandMark size={40} withWordmark className="d-lg-none mb-4" />
         <h1 className="el-auth__title">{title}</h1>
         {subtitle && <p className="el-auth__subtitle">{subtitle}</p>}
+        <ServerNotice />
         {children}
         {footer && <div className="el-auth__footer">{footer}</div>}
       </motion.div>
