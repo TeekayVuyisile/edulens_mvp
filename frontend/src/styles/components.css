@@ -629,6 +629,16 @@ body > #root > .el-fullpage-loader {
   color: #166534;
 }
 
+.el-form-alert--warning {
+  background: var(--el-accent-soft);
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.el-spin {
+  animation: el-spin 0.8s linear infinite;
+}
+
 .el-password {
   position: relative;
 }

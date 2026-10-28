@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_ORIGIN, whenServerReady } from './serverStatus';
 
 // Pages call the shared axios instance directly (axios.get('/api/...')), so the
 // session logic lives in interceptors on that instance rather than in each page.
@@ -31,8 +32,13 @@ export const tokenStore = {
 };
 
 axios.defaults.timeout = 15000;
+// Pages use relative /api/... paths. In production the API is a separate service (the app is a
+// static site), so VITE_API_URL points them at it; locally the Vite proxy handles /api.
+if (API_ORIGIN) axios.defaults.baseURL = API_ORIGIN;
 
-axios.interceptors.request.use((config) => {
+axios.interceptors.request.use(async (config) => {
+  // Hold requests while a sleeping API wakes up, so the timeout only counts once it's awake.
+  await whenServerReady();
   const token = tokenStore.get();
   if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`;

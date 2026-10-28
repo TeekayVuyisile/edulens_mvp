@@ -8,6 +8,10 @@ import './styles/components.css';
 import './styles/ui-kit.css';
 import './styles/classroom.css';
 import App from './App.jsx';
+import { wakeServer } from './lib/serverStatus';
+
+// Start waking the API (free hosting sleeps when idle) before anything asks it for data.
+wakeServer();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
