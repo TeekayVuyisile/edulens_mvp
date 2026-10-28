@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import app from '../src/app.js';
+import app, { isUnlimited } from '../src/app.js';
 
 describe('app', () => {
   it('GET /api/health reports the API is up', async () => {
@@ -19,5 +19,13 @@ describe('app', () => {
       message: 'Route not found',
       path: '/api/does-not-exist',
     });
+  });
+
+  it('rate-limits API calls but not the health check or page assets', () => {
+    expect(isUnlimited('/api/health')).toBe(true);
+    expect(isUnlimited('/assets/index.js')).toBe(true);
+    expect(isUnlimited('/login')).toBe(true);
+    expect(isUnlimited('/api/auth/login')).toBe(false);
+    expect(isUnlimited('/api/learners')).toBe(false);
   });
 });
