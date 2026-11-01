@@ -39,10 +39,14 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isTest
+  skip: (req) => isTest || isUnlimited(req.path)
 });
 
-// Apply rate limiting to all requests
+// Only API calls count. The health check is exempt: Render's health checker polls it every
+// few seconds from one address and would otherwise be throttled, marking the service down.
+// Page assets are exempt too, or a few page loads would use up a visitor's allowance.
+export const isUnlimited = (path) => path === '/api/health' || !path.startsWith('/api/');
+
 app.use(limiter);
 
 // Security middleware
