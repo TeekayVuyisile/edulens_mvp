@@ -27,8 +27,12 @@ describe('demo seed', () => {
     expect(counts.marks).toBeGreaterThan(100);
   });
 
-  it('can start over with --reset', async () => {
+  it('can start over with --reset, even after visitors made changes', async () => {
     await seedDemo();
+    await pool.query(
+      `INSERT INTO activity_logs (user_id, school_id, action_type)
+       SELECT user_id, school_id, 'PUT /api/teacher/assessments/x/marks' FROM users WHERE email = 'demo.teacher@example.com'`
+    );
 
     const again = await seedDemo({ reset: true });
 

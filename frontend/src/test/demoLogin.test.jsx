@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { tokenStore } from '../lib/http';
-import { mockApi, renderApp, TEACHER } from './utils';
+import { mockApi, renderApp, SCHOOL_ADMIN, TEACHER } from './utils';
 
 const DEMO = {
   status: 'success',
@@ -42,6 +42,27 @@ describe('demo sign-in', () => {
     await user.click(screen.getByRole('button', { name: 'Try another role' }));
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
     expect(tokenStore.get()).toBeNull();
+  });
+
+  it('switching roles from a deep page opens the new role’s dashboard', async () => {
+    const user = userEvent.setup();
+    tokenStore.set('teacher-token');
+    const requests = mockApi({
+      'GET /api/auth/profile': { status: 'success', data: { user: { ...TEACHER, is_demo: true } } },
+      'GET /api/teacher/worksheets/library': { status: 'success', data: { worksheets: [] } },
+      'GET /api/auth/demo': DEMO,
+      'POST /api/auth/demo-login': {
+        status: 'success',
+        data: { token: 'admin-token', user: { ...SCHOOL_ADMIN, is_demo: true } },
+      },
+    });
+
+    renderApp('/teacher/worksheets');
+    await user.click(await screen.findByRole('button', { name: 'Try another role' }));
+    await user.click(await screen.findByRole('button', { name: /demo school admin/ }));
+
+    await waitFor(() => expect(requests.some((r) => r.url === '/api/school-admin/dashboard')).toBe(true));
+    expect(screen.queryByText(/don’t have access/)).toBeNull();
   });
 
   it('shows only the normal form when the server has no demo', async () => {

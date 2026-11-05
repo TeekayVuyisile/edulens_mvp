@@ -14,6 +14,17 @@ their children's progress from their phones, and AI writes printable worksheets.
 > On the sign-in page, pick **Teacher**, **School Admin** or **Parent** under *Explore the demo*. You're signed in
 > with one click, no password needed. The free server sleeps when idle, so the first visit can take up to a minute.
 
+### Watch the demo (1:43)
+
+[![Edulens LMS demo video: click to watch](docs/demo/edulens-demo-poster.jpg)](docs/demo/edulens-demo.mp4)
+
+A captioned walkthrough of the demo school, with no sound needed:
+
+1. **Teacher:** one-click demo sign-in, marks entry with live percentages and CAPS levels, the class marksheet, and an
+   AI-written worksheet.
+2. **School admin:** the school dashboard, reports, and closing the year.
+3. **Parent:** a child's marks with the teacher's comments.
+
 | Marks entry (teacher) | Reports (school admin) |
 |---|---|
 | ![Marks entry](docs/screenshots/teacher-marks-entry.png) | ![Reports](docs/screenshots/school-admin-reports.png) |
@@ -188,7 +199,7 @@ frontend/
   src/components/      ui/ kit, learners/, worksheets/, charts/, layout/
   src/styles/          theme, UI kit and classroom styles
 database/migrations/   001–010, applied in order
-docs/                  design system and screenshots
+docs/                  design system, screenshots and the demo video (docs/demo/)
 render.yaml            Render blueprint
 ```
 

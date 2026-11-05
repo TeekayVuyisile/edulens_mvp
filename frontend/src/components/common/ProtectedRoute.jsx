@@ -6,11 +6,13 @@ import { useAuth } from '../../contexts/useAuth';
  * when `allowedRoles` is given, only for those roles.
  */
 const ProtectedRoute = ({ allowedRoles, children }) => {
-  const { user } = useAuth();
+  const { user, signedOut } = useAuth();
   const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Remember the page only for visitors sent here (a deep link or an expired
+    // session), not after signing out: the next person may have another role.
+    return <Navigate to="/login" state={signedOut ? undefined : { from: location }} replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {

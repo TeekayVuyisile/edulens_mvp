@@ -15,6 +15,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [status, setStatus] = useState(() => (tokenStore.get() ? 'loading' : 'ready'));
   const [notice, setNotice] = useState(null);
+  // True after the user signs out themselves, so the next sign-in (perhaps as
+  // someone else) starts on their own dashboard instead of the page left behind.
+  const [signedOut, setSignedOut] = useState(false);
 
   const clearSession = useCallback(() => {
     tokenStore.clear();
@@ -62,6 +65,7 @@ export const AuthProvider = ({ children }) => {
       tokenStore.set(token);
       setUser(signedIn);
       setNotice(null);
+      setSignedOut(false);
       return { ok: true, user: signedIn };
     } catch (error) {
       return { ok: false, message: errorMessage(error, 'Sign in failed. Please try again.') };
@@ -76,6 +80,7 @@ export const AuthProvider = ({ children }) => {
       tokenStore.set(token);
       setUser(signedIn);
       setNotice(null);
+      setSignedOut(false);
       return { ok: true, user: signedIn };
     } catch (error) {
       return { ok: false, message: errorMessage(error, 'Couldn’t open the demo. Please try again.') };
@@ -87,6 +92,7 @@ export const AuthProvider = ({ children }) => {
     if (tokenStore.get()) http.post('/api/auth/logout').catch(() => {});
     clearSession();
     setNotice(null);
+    setSignedOut(true);
   }, [clearSession]);
 
   const forgotPassword = useCallback(async (email) => {
@@ -119,6 +125,7 @@ export const AuthProvider = ({ children }) => {
       status,
       notice,
       isAuthenticated: Boolean(user),
+      signedOut,
       login,
       demoLogin,
       logout,
@@ -127,7 +134,7 @@ export const AuthProvider = ({ children }) => {
       updateProfile,
       dismissNotice: () => setNotice(null),
     }),
-    [user, status, notice, login, demoLogin, logout, forgotPassword, resetPassword, updateProfile]
+    [user, status, notice, signedOut, login, demoLogin, logout, forgotPassword, resetPassword, updateProfile]
   );
 
   return (

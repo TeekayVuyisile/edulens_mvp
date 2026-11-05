@@ -106,6 +106,8 @@ export const seedDemo = async ({ reset = false } = {}) => {
       // Explicit order: assessments (and their marks) reference staff accounts.
       await client.query('DELETE FROM assessments WHERE class_id IN (SELECT class_id FROM classes WHERE school_id = $1)', [schoolId]);
       await client.query('DELETE FROM classes WHERE school_id = $1', [schoolId]);
+      // Visitors' changes are logged against the demo school; that history goes with it.
+      await client.query('DELETE FROM activity_logs WHERE school_id = $1', [schoolId]);
       await client.query('DELETE FROM schools WHERE school_id = $1', [schoolId]);
       await client.query(
         'UPDATE activity_logs SET user_id = NULL WHERE user_id IN (SELECT user_id FROM users WHERE email = ANY($1))',
