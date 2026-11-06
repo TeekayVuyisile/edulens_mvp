@@ -16,7 +16,10 @@ their children's progress from their phones, and AI writes printable worksheets.
 
 ### Watch the demo (1:43)
 
-[![Edulens LMS demo video: click to watch](docs/demo/edulens-demo-poster.jpg)](docs/demo/edulens-demo.mp4)
+
+https://github.com/user-attachments/assets/6d92d799-6328-4ea3-8b6d-dfedd7f2eca4
+
+
 
 A captioned walkthrough of the demo school, with no sound needed:
 
